@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battle Tetris: Multiplayer Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        #game-container {
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <script>
+        // Firebase Configuration - REPLACE WITH YOUR FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const BLOCK_SIZE = 30;
+        const GRID_WIDTH = 10;
+        const GRID_HEIGHT = 20;
+        const GAME_WIDTH = BLOCK_SIZE * (GRID_WIDTH + 8);
+        const GAME_HEIGHT = BLOCK_SIZE * GRID_HEIGHT;
+
+        // Tetromino shapes
+        const SHAPES = {
+            I: [[1, 1, 1, 1]],
+            O: [[1, 1], [1, 1]],
+            T: [[0, 1, 0], [1, 1, 1]],
+            S: [[0, 1, 1], [1, 1, 0]],
+            Z: [[1, 1, 0], [0, 1, 1]],
+            J: [[1, 0, 0], [1, 1, 1]],
+            L: [[0, 0, 1], [1, 1, 1]]
+        };
+
+        const COLORS = {
+            I: 0x00f0f0,
+            O: 0xf0f000,
+            T: 0xa000f0,
+            S: 0x00f000,
+            Z: 0xf00000,
+            J: 0x0000f0,
+            L: 0xf0a000
+        };
+
+        // Quiz questions based on Phoenician civilization
+        const QUIZ_QUESTIONS = [
+            {
+                question: "Where was Phoenicia located?",
+                answers: [
+                    "Along the Mediterranean coast in what is now Lebanon",
+                    "In the heart of Mesopotamia",
+                    "On the Iberian Peninsula",
+                    "In ancient Egypt"
+                ],
+                correct: 0
+            },
+            {
+                question: "What color dye were the Phoenicians famous for making?",
+                answers: [
+                    "Red dye from beetles",
+                    "Blue dye from plants",
+                    "Purple dye from sea snails",
+                    "Yellow dye from flowers"
+                ],
+                correct: 2
+            },
+            {
+                question: "How many symbols were in the Phoenician alphabet?",
+                answers: [
+                    "10 symbols",
+                    "22 symbols",
+                    "50 symbols",
+                    "100 symbols"
+                ],
+                correct: 1
+            },
+            {
+                question: "What writing system did the Phoenicians improve upon?",
+                answers: [
+                    "Hieroglyphics",
+                    "Cuneiform",
+                    "Sanskrit",
+                    "Pictographs"
+                ],
+                correct: 1
+            },
+            {
+                question: "What famous Phoenician colony later fought three wars against Rome?",
+                answers: [
+                    "Tyre",
+                    "Sidon",
+                    "Carthage",
+                    "Byblos"
+                ],
+                correct: 2
+            },
+            {
+                question: "Why did Phoenicians turn to sea trade?",
+                answers: [
+                    "They had too much farmland",
+                    "Mountains left little flat land for farming",
+                    "Their king commanded it",
+                    "They were conquered by sailors"
+                ],
+                correct: 1
+            },
+            {
+                question: "What peoples did Phoenician society develop from?",
+                answers: [
+                    "The Sumerians",
+                    "The Egyptians",
+                    "The Canaanites",
+                    "The Romans"
+                ],
+                correct: 2
+            },
+            {
+                question: "What is an import?",
+                answers: [
+                    "A good produced and sold within a country",
+                    "A good sold within a country that is produced elsewhere",
+                    "A type of ship",
+                    "A trading route"
+                ],
+                correct: 1
+            },
+            {
+                question: "The word 'alphabet' comes from which two Greek letters?",
+                answers: [
+                    "Alpha and beta",
+                    "Alpha and gamma",
+                    "Beta and delta",
+                    "Alpha and omega"
+                ],
+                correct: 0
+            },
+            {
+                question: "What mountains formed Phoenicia's eastern border?",
+                answers: [
+                    "The Alps Mountains",
+                    "The Atlas Mountains",
+                    "The Lebanon Mountains",
+                    "The Zagros Mountains"
+                ],
+                correct: 2
+            },
+            {
+                question: "What did Phoenician colonies originally serve as?",
+                answers: [
+                    "Military forts",
+                    "Trading stations for ships",
+                    "Religious temples",
+                    "Prison colonies"
+                ],
+                correct: 1
+            },
+            {
+                question: "What precious metals did Phoenicians trade for in Iberia and West Africa?",
+                answers: [
+                    "Copper and bronze",
+                    "Iron and tin",
+                    "Silver and gold",
+                    "Platinum and titanium"
+                ],
+                correct: 2
+            }
+        ];
+
+        // Title Screen Scene
+        class TitleScreen extends Phaser.Scene {
+            constructor() {
+                super({ key: 'TitleScreen' });
+            }
+
+            create() {
+                const centerX = this.cameras.main.width / 2;
+                const centerY = this.cameras.main.height / 2;
+
+                // Background
+                this.cameras.main.setBackgroundColor('#1a1a2e');
+
+                // Animated background blocks
+                this.createFloatingBlocks();
+
+                // Title
+                const title = this.add.text(centerX, centerY - 200, 'BATTLE TETRIS', {
+                    fontSize: '64px',
+                    fontStyle: 'bold',
+                    color: '#ffffff',
+                    stroke: '#667eea',
+                    strokeThickness: 6
+                }).setOrigin(0.5);
+
+                const subtitle = this.add.text(centerX, centerY - 140, 'Multiplayer Edition', {
+                    fontSize: '32px',
+                    fontStyle: 'italic',
+                    color: '#667eea'
+                }).setOrigin(0.5);
+
+                // Player name input
+                this.add.text(centerX, centerY - 60, 'Enter Your Name:', {
+                    fontSize: '20px',
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+
+                const nameInput = this.add.dom(centerX, centerY - 20, 'input', {
+                    type: 'text',
+                    placeholder: 'Player Name',
+                    maxLength: '15',
+                    fontSize: '18px',
+                    padding: '10px',
+                    width: '250px',
+                    borderRadius: '5px',
+                    border: '2px solid #667eea',
+                    textAlign: 'center',
+                    backgroundColor: '#2a2a3e',
+                    color: '#ffffff'
+                });
+
+                // Buttons
+                const playButton = this.createButton(centerX, centerY + 40, 'PLAY SOLO', () => {
+                    const name = nameInput.node.value.trim() || 'Player';
+                    this.scene.start('TetrisGame', { playerName: name, multiplayer: false });
+                });
+
+                const multiplayerButton = this.createButton(centerX, centerY + 110, 'JOIN MULTIPLAYER', () => {
+                    const name = nameInput.node.value.trim() || 'Player';
+                    this.scene.start('LobbyScene', { playerName: name });
+                });
+
+                const leaderboardButton = this.createButton(centerX, centerY + 180, 'LEADERBOARD', () => {
+                    this.scene.start('LeaderboardScene');
+                });
+
+                // Instructions
+                this.add.text(centerX, centerY + 250, 'Clear lines to attack opponents! Answer quiz questions for power-ups!', {
+                    fontSize: '14px',
+                    color: '#aaaaaa',
+                    align: 'center',
+                    wordWrap: { width: 500 }
+                }).setOrigin(0.5);
+
+                // Copyright
+                this.add.text(centerX, this.cameras.main.height - 30, '© Jason Slaughter - PixelED Path, LLC', {
+                    fontSize: '14px',
+                    color: '#888888'
+                }).setOrigin(0.5);
+
+                // Pulse animation for title
+                this.tweens.add({
+                    targets: title,
+                    scale: 1.05,
+                    duration: 1000,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            }
+
+            createButton(x, y, text, callback) {
+                const button = this.add.rectangle(x, y, 300, 50, 0x667eea)
+                    .setInteractive()
+                    .setStrokeStyle(2, 0xffffff);
+
+                const buttonText = this.add.text(x, y, text, {
+                    fontSize: '20px',
+                    fontStyle: 'bold',
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+
+                button.on('pointerover', () => {
+                    button.setFillStyle(0x7a8ef5);
+                });
+
+                button.on('pointerout', () => {
+                    button.setFillStyle(0x667eea);
+                });
+
+                button.on('pointerdown', callback);
+
+                return { button, text: buttonText };
+            }
+
+            createFloatingBlocks() {
+                const colors = Object.values(COLORS);
+                for (let i = 0; i < 15; i++) {
+                    const x = Math.random() * this.cameras.main.width;
+                    const y = Math.random() * this.cameras.main.height;
+                    const block = this.add.rectangle(x, y, 20, 20, colors[Math.floor(Math.random() * colors.length)], 0.3);
+                    
+                    this.tweens.add({
+                        targets: block,
+                        y: y + (Math.random() * 200 - 100),
+                        x: x + (Math.random() * 200 - 100),
+                        duration: 3000 + Math.random() * 2000,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut'
+                    });
+                }
+            }
+        }
+
+        // Lobby Scene
+        class LobbyScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'LobbyScene' });
+            }
+
+            init(data) {
+                this.playerName = data.playerName;
+            }
+
+            create() {
+                this.cameras.main.setBackgroundColor('#1a1a2e');
+                const centerX = this.cameras.main.width / 2;
+
+                this.add.text(centerX, 50, 'MULTIPLAYER LOBBY', {
+                    fontSize: '36px',
+                    fontStyle: 'bold',
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+
+                this.add.text(centerX, 120, 'Searching for opponents...', {
+                    fontSize: '20px',
+                    color: '#aaaaaa'
+                }).setOrigin(0.5);
+
+                this.playersList = this.add.text(centerX, 200, '', {
+                    fontSize: '18px',
+                    color: '#ffffff',
+                    align: 'center'
+                }).setOrigin(0.5);
+
+                // Create or join a game room
+                this.setupMultiplayer();
+
+                // Back button
+                this.createButton(centerX, 500, 'BACK TO MENU', () => {
+                    if (this.roomRef) {
+                        this.roomRef.off();
+                    }
+                    this.scene.start('TitleScreen');
+                });
+            }
+
+            async setupMultiplayer() {
+                // Find available room or create new one
+                const roomsRef = database.ref('rooms');
+                const snapshot = await roomsRef.once('value');
+                const rooms = snapshot.val() || {};
+
+                let roomId = null;
+                
+                // Look for available room (less than 4 players)
+                for (let id in rooms) {
+                    const playerCount = rooms[id].players ? Object.keys(rooms[id].players).length : 0;
+                    if (playerCount < 4 && rooms[id].status === 'waiting') {
+                        roomId = id;
+                        break;
+                    }
+                }
+
+                // Create new room if none available
+                if (!roomId) {
+                    roomId = database.ref('rooms').push().key;
+                    await database.ref(`rooms/${roomId}`).set({
+                        status: 'waiting',
+                        createdAt: Date.now()
+                    });
+                }
+
+                this.roomId = roomId;
+                this.playerId = database.ref(`rooms/${roomId}/players`).push().key;
+
+                // Join room
+                await database.ref(`rooms/${roomId}/players/${this.playerId}`).set({
+                    name: this.playerName,
+                    score: 0,
+                    alive: true
+                });
+
+                // Listen for room updates
+                this.roomRef = database.ref(`rooms/${roomId}`);
+                this.roomRef.on('value', (snapshot) => {
+                    const room = snapshot.val();
+                    if (room && room.players) {
+                        const players = Object.values(room.players);
+                        this.playersList.setText(`Players in lobby:\n${players.map(p => p.name).join('\n')}`);
+
+                        // Start game when 2+ players
+                        if (players.length >= 2 && room.status === 'waiting') {
+                            database.ref(`rooms/${roomId}/status`).set('playing');
+                            this.roomRef.off();
+                            this.scene.start('TetrisGame', {
+                                playerName: this.playerName,
+                                multiplayer: true,
+                                roomId: this.roomId,
+                                playerId: this.playerId
+                            });
+                        }
+                    }
+                });
+            }
+
+            createButton(x, y, text, callback) {
+                const button = this.add.rectangle(x, y, 250, 50, 0x667eea)
+                    .setInteractive()
+                    .setStrokeStyle(2, 0xffffff);
+
+                const buttonText = this.add.text(x, y, text, {
+                    fontSize: '18px',
+                    fontStyle: 'bold',
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+
+                button.on('pointerover', () => button.setFillStyle(0x7a8ef5));
+                button.on('pointerout', () => button.setFillStyle(0x667eea));
+                button.on('pointerdown', callback);
+
+                return { button, text: buttonText };
+            }
+        }
+
+        // Leaderboard Scene
+        class LeaderboardScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'LeaderboardScene' });
+            }
+
+            create() {
+                this.cameras.main.setBackgroundColor('#1a1a2e');
+                const centerX = this.cameras.main.width / 2;
+
+                this.add.text(centerX, 50, 'TOP PLAYERS', {
+                    fontSize: '36px',
+                    fontStyle: 'bold',
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+
+                this.leaderboardText = this.add.text(centerX, 150, 'Loading...', {
+                    fontSize: '18px',
+                    color: '#ffffff',
+                    align: 'left'
+                }).setOrigin(0.5, 0);
+
+                this.loadLeaderboard();
+
+                // Back button
+                this.createButton(centerX, 550, 'BACK TO MENU', () => {
+                    this.scene.start('TitleScreen');
+                });
+            }
+
+            async loadLeaderboard() {
+                const leaderboardRef = database.ref('leaderboard').orderByChild('score').limitToLast(10);
+                const snapshot = await leaderboardRef.once('value');
+                const scores = [];
+
+                snapshot.forEach((child) => {
+                    scores.push(child.val());
+                });
+
+                scores.reverse(); // Highest first
+
+                if (scores.length === 0) {
+                    this.leaderboardText.setText('No scores yet!\nBe the first to play!');
+                } else {
+                    let text = '';
+                    scores.forEach((score, index) => {
+                        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+                        text += `${medal} ${score.name.padEnd(15)} ${score.score.toString().padStart(8)}\n`;
+                    });
+                    this.leaderboardText.setText(text);
+                    this.leaderboardText.setFontFamily('monospace');
+                }
+            }
+
+            createButton(x, y, text, callback) {
+                const button = this.add.rectangle(x, y, 250, 50, 0x667eea)
+                    .setInteractive()
+                    .setStrokeStyle(2, 0xffffff);
+
+                const buttonText = this.add.text(x, y, text, {
+                    fontSize: '18px',
+                    fontStyle: 'bold',
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+
+                button.on('pointerover', () => button.setFillStyle(0x7a8ef5));
+                button.on('pointerout', () => button.setFillStyle(0x667eea));
+                button.on('pointerdown', callback);
+
+                return { button, text: buttonText };
+            }
+        }
+
+        // Main Tetris Game Scene
+        class TetrisGame extends Phaser.Scene {
+            constructor() {
+                super({ key: 'TetrisGame' });
+            }
+
+            init(data) {
+                this.playerName = data.playerName;
+                this.isMultiplayer = data.multiplayer;
+                this.roomId = data.roomId;
+                this.playerId = data.playerId;
+            }
+
+            create() {
+                // Initialize game state
+                this.grid = Array(GRID_HEIGHT).fill(null).map(() => Array(GRID_WIDTH).fill(0));
+                this.gridGraphics = Array(GRID_HEIGHT).fill(null).map(() => Array(GRID_WIDTH).fill(null));
+                this.score = 0;
+                this.level = 1;
+                this.lines = 0;
+                this.gameOver = false;
+                this.dropTimer = 0;
+                this.dropInterval = 1000;
+                this.fastDrop = false;
+                this.combo = 0;
+                this.lastClearTime = 0;
+
+                // Quiz system
+                this.quizTimer = 0;
+                this.quizInterval = 40000; // 40 seconds
+                this.quizActive = false;
+                this.quizOverlay = null;
+                this.usedQuestions = [];
+
+                // Multiplayer
+                this.opponents = {};
+                this.incomingAttack = 0;
+
+                // Create graphics
+                this.cameras.main.setBackgroundColor('#1a1a2e');
+                
+                // Draw main player grid
+                this.createMainGrid();
+
+                // UI Panel
+                const panelX = BLOCK_SIZE * GRID_WIDTH + 20;
+                
+                this.add.text(panelX, 30, this.playerName, {
+                    fontSize: '20px',
+                    fontStyle: 'bold',
+                    color: '#667eea'
+                });
+
+                this.add.text(panelX, 70, 'SCORE', {
+                    fontSize: '18px',
+                    color: '#aaaaaa'
+                });
+                this.scoreText = this.add.text(panelX, 95, '0', {
+                    fontSize: '24px',
+                    fontStyle: 'bold',
+                    color: '#ffffff'
+                });
+
+                this.add.text(panelX, 150, 'LINES', {
+                    fontSize: '18px',
+                    color: '#aaaaaa'
+                });
+                this.linesText = this.add.text(panelX, 175, '0', {
+                    fontSize: '24px',
+                    fontStyle: 'bold',
+                    color: '#ffffff'
+                });
+
+                this.add.text(panelX, 230, 'LEVEL', {
+                    fontSize: '18px',
+                    color: '#aaaaaa'
+                });
+                this.levelText = this.add.text(panelX, 255, '1', {
+                    fontSize: '24px',
+                    fontStyle: 'bold',
+                    color: '#ffffff'
+                });
+
+                if (this.isMultiplayer) {
+                    this.add.text(panelX, 310, 'COMBO', {
+                        fontSize: '18px',
+                        color: '#aaaaaa'
+                    });
+                    this.comboText = this.add.text(panelX, 335, 'x0', {
+                        fontSize: '24px',
+                        fontStyle: 'bold',
+                        color: '#ff6600'
+                    });
+                }
+
+                this.add.text(panelX, 390, 'NEXT', {
+                    fontSize: '18px',
+                    color: '#aaaaaa'
+                });
+
+                // Keyboard input
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.input.keyboard.on('keydown-SPACE', () => this.hardDrop());
+                this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
+                
+                this.lastRotateTime = 0;
+                this.lastMoveTime = 0;
+
+                // Initialize first piece
+                this.spawnNewPiece();
+                this.spawnNextPiece();
+                this.drawNextPiece();
+
+                // Setup multiplayer if needed
+                if (this.isMultiplayer) {
+                    this.setupMultiplayerSync();
+                    this.createOpponentPreviews();
+                }
+            }
+
+            createMainGrid() {
+                const gridBg = this.add.rectangle(
+                    BLOCK_SIZE * GRID_WIDTH / 2,
+                    BLOCK_SIZE * GRID_HEIGHT / 2,
+                    BLOCK_SIZE * GRID_WIDTH,
+                    BLOCK_SIZE * GRID_HEIGHT,
+                    0x0f0f1e
+                );
+
+                // Draw grid lines
+                for (let y = 0; y <= GRID_HEIGHT; y++) {
+                    this.add.line(
+                        0, 0,
+                        0, y * BLOCK_SIZE,
+                        GRID_WIDTH * BLOCK_SIZE, y * BLOCK_SIZE,
+                        0x2a2a3e
+                    ).setOrigin(0);
+                }
+                for (let x = 0; x <= GRID_WIDTH; x++) {
+                    this.add.line(
+                        0, 0,
+                        x * BLOCK_SIZE, 0,
+                        x * BLOCK_SIZE, GRID_HEIGHT * BLOCK_SIZE,
+                        0x2a2a3e
+                    ).setOrigin(0);
+                }
+            }
+
+            createOpponentPreviews() {
+                const startY = 480;
+                const previewWidth = 100;
+                const previewHeight = 120;
+                const spacing = 10;
+
+                this.opponentPreviews = [];
+                
+                for (let i = 0; i < 3; i++) {
+                    const x = BLOCK_SIZE * GRID_WIDTH + 20;
+                    const y = startY + i * (previewHeight + spacing);
+                    
+                    const bg = this.add.rectangle(x + previewWidth/2, y + previewHeight/2, previewWidth, previewHeight, 0x0f0f1e, 0.5)
+                        .setStrokeStyle(2, 0x2a2a3e);
+                    
+                    const nameText = this.add.text(x + 5, y + 5, 'Waiting...', {
+                        fontSize: '10px',
+                        color: '#aaaaaa'
+                    });
+
+                    this.opponentPreviews.push({ bg, nameText, x, y });
+                }
+            }
+
+            setupMultiplayerSync() {
+                // Send game state updates
+                this.gameStateRef = database.ref(`rooms/${this.roomId}/players/${this.playerId}`);
+                
+                // Listen for opponent states
+                database.ref(`rooms/${this.roomId}/players`).on('value', (snapshot) => {
+                    const players = snapshot.val() || {};
+                    this.updateOpponents(players);
+                });
+
+                // Listen for incoming attacks
+                database.ref(`rooms/${this.roomId}/players/${this.playerId}/incomingAttack`).on('value', (snapshot) => {
+                    const attack = snapshot.val() || 0;
+                    if (attack > 0) {
+                        this.receiveAttack(attack);
+                        database.ref(`rooms/${this.roomId}/players/${this.playerId}/incomingAttack`).set(0);
+                    }
+                });
+            }
+
+            updateOpponents(players) {
+                const opponents = Object.entries(players).filter(([id, _]) => id !== this.playerId);
+                
+                opponents.forEach(([id, player], index) => {
+                    if (index < this.opponentPreviews.length && player.alive) {
+                        this.opponentPreviews[index].nameText.setText(`${player.name}\n${player.score}`);
+                    }
+                });
+            }
+
+            sendAttack(lines) {
+                if (!this.isMultiplayer) return;
+
+                // Send garbage lines to all opponents
+                database.ref(`rooms/${this.roomId}/players`).once('value', (snapshot) => {
+                    const players = snapshot.val() || {};
+                    
+                    Object.keys(players).forEach((id) => {
+                        if (id !== this.playerId && players[id].alive) {
+                            const currentAttack = players[id].incomingAttack || 0;
+                            database.ref(`rooms/${this.roomId}/players/${id}/incomingAttack`).set(currentAttack + lines);
+                        }
+                    });
+                });
+
+                // Show attack indicator
+                this.showAttackIndicator(lines);
+            }
+
+            showAttackIndicator(lines) {
+                const text = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `⚔️ ${lines} LINE ATTACK! ⚔️`, {
+                    fontSize: '24px',
+                    fontStyle: 'bold',
+                    color: '#ff0000',
+                    stroke: '#ffffff',
+                    strokeThickness: 3
+                }).setOrigin(0.5);
+
+                this.tweens.add({
+                    targets: text,
+                    y: GAME_HEIGHT / 2 - 100,
+                    alpha: 0,
+                    duration: 1500,
+                    onComplete: () => text.destroy()
+                });
+            }
+
+            receiveAttack(lines) {
+                this.addDummyLines(lines);
+                
+                const text = this.add.text(GAME_WIDTH / 2, 100, `⚠️ INCOMING ${lines} LINES! ⚠️`, {
+                    fontSize: '20px',
+                    fontStyle: 'bold',
+                    color: '#ff6600',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                }).setOrigin(0.5);
+
+                this.tweens.add({
+                    targets: text,
+                    y: 50,
+                    alpha: 0,
+                    duration: 2000,
+                    onComplete: () => text.destroy()
+                });
+            }
+
+            spawnNewPiece() {
+                if (this.nextPiece) {
+                    this.currentPiece = this.nextPiece;
+                } else {
+                    const shapes = Object.keys(SHAPES);
+                    const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+                    this.currentPiece = {
+                        shape: SHAPES[randomShape],
+                        type: randomShape,
+                        x: Math.floor(GRID_WIDTH / 2) - 1,
+                        y: 0,
+                        color: COLORS[randomShape]
+                    };
+                }
+
+                if (this.checkCollision(this.currentPiece.x, this.currentPiece.y, this.currentPiece.shape)) {
+                    this.endGame();
+                }
+            }
+
+            spawnNextPiece() {
+                const shapes = Object.keys(SHAPES);
+                const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+                this.nextPiece = {
+                    shape: SHAPES[randomShape],
+                    type: randomShape,
+                    x: Math.floor(GRID_WIDTH / 2) - 1,
+                    y: 0,
+                    color: COLORS[randomShape]
+                };
+            }
+
+            drawNextPiece() {
+                if (this.nextPieceGraphics) {
+                    this.nextPieceGraphics.forEach(row => row.forEach(block => {
+                        if (block) block.destroy();
+                    }));
+                }
+
+                this.nextPieceGraphics = [];
+                const startX = BLOCK_SIZE * GRID_WIDTH + 40;
+                const startY = 420;
+
+                this.nextPiece.shape.forEach((row, y) => {
+                    this.nextPieceGraphics[y] = [];
+                    row.forEach((cell, x) => {
+                        if (cell) {
+                            const block = this.add.rectangle(
+                                startX + x * 25,
+                                startY + y * 25,
+                                23, 23,
+                                this.nextPiece.color
+                            );
+                            this.nextPieceGraphics[y][x] = block;
+                        }
+                    });
+                });
+            }
+
+            update(time, delta) {
+                if (this.gameOver || this.paused) return;
+
+                // Quiz timer
+                if (!this.quizActive) {
+                    this.quizTimer += delta;
+                    if (this.quizTimer >= this.quizInterval) {
+                        this.quizTimer = 0;
+                        this.showQuiz();
+                        return;
+                    }
+                }
+
+                if (this.quizActive) return;
+
+                // Handle input
+                if (this.cursors.left.isDown && time > this.lastMoveTime + 100) {
+                    this.movePiece(-1, 0);
+                    this.lastMoveTime = time;
+                } else if (this.cursors.right.isDown && time > this.lastMoveTime + 100) {
+                    this.movePiece(1, 0);
+                    this.lastMoveTime = time;
+                }
+
+                if (this.cursors.up.isDown && time > this.lastRotateTime + 200) {
+                    this.rotatePiece();
+                    this.lastRotateTime = time;
+                }
+
+                this.fastDrop = this.cursors.down.isDown;
+                const currentInterval = this.fastDrop ? 50 : this.dropInterval;
+
+                this.dropTimer += delta;
+                if (this.dropTimer >= currentInterval) {
+                    this.dropTimer = 0;
+                    if (!this.movePiece(0, 1)) {
+                        this.lockPiece();
+                    }
+                }
+
+                // Check combo timeout
+                if (time - this.lastClearTime > 3000) {
+                    this.combo = 0;
+                    if (this.comboText) this.comboText.setText('x0');
+                }
+
+                this.render();
+                
+                // Sync multiplayer state
+                if (this.isMultiplayer && time % 1000 < 16) {
+                    this.syncGameState();
+                }
+            }
+
+            syncGameState() {
+                if (this.gameStateRef) {
+                    this.gameStateRef.update({
+                        score: this.score,
+                        alive: !this.gameOver,
+                        grid: this.grid
+                    });
+                }
+            }
+
+            movePiece(dx, dy) {
+                const newX = this.currentPiece.x + dx;
+                const newY = this.currentPiece.y + dy;
+
+                if (!this.checkCollision(newX, newY, this.currentPiece.shape)) {
+                    this.currentPiece.x = newX;
+                    this.currentPiece.y = newY;
+                    return true;
+                }
+                return false;
+            }
+
+            rotatePiece() {
+                const rotated = this.currentPiece.shape[0].map((_, i) =>
+                    this.currentPiece.shape.map(row => row[i]).reverse()
+                );
+
+                if (!this.checkCollision(this.currentPiece.x, this.currentPiece.y, rotated)) {
+                    this.currentPiece.shape = rotated;
+                }
+            }
+
+            hardDrop() {
+                while (this.movePiece(0, 1)) {
+                    this.score += 2;
+                }
+                this.lockPiece();
+                this.scoreText.setText(this.score);
+            }
+
+            checkCollision(x, y, shape) {
+                for (let row = 0; row < shape.length; row++) {
+                    for (let col = 0; col < shape[row].length; col++) {
+                        if (shape[row][col]) {
+                            const newX = x + col;
+                            const newY = y + row;
+
+                            if (newX < 0 || newX >= GRID_WIDTH || newY >= GRID_HEIGHT) {
+                                return true;
+                            }
+
+                            if (newY >= 0 && this.grid[newY][newX]) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            lockPiece() {
+                this.currentPiece.shape.forEach((row, y) => {
+                    row.forEach((cell, x) => {
+                        if (cell) {
+                            const gridY = this.currentPiece.y + y;
+                            const gridX = this.currentPiece.x + x;
+                            if (gridY >= 0 && gridY < GRID_HEIGHT && gridX >= 0 && gridX < GRID_WIDTH) {
+                                this.grid[gridY][gridX] = this.currentPiece.color;
+                            }
+                        }
+                    });
+                });
+
+                const linesCleared = this.clearLines();
+                if (linesCleared > 0) {
+                    this.lines += linesCleared;
+                    const baseScore = [0, 100, 300, 500, 800][linesCleared];
+                    this.score += baseScore * this.level * (1 + this.combo * 0.5);
+                    this.linesText.setText(this.lines);
+                    this.scoreText.setText(Math.floor(this.score));
+
+                    // Update combo
+                    this.combo++;
+                    this.lastClearTime = this.time.now;
+                    if (this.comboText) this.comboText.setText(`x${this.combo}`);
+
+                    // Attack in multiplayer
+                    if (this.isMultiplayer && linesCleared >= 2) {
+                        const attackLines = linesCleared === 2 ? 1 : linesCleared === 3 ? 2 : 4;
+                        this.sendAttack(attackLines * Math.max(1, Math.floor(this.combo / 2)));
+                    }
+
+                    // Level up
+                    const newLevel = Math.floor(this.lines / 10) + 1;
+                    if (newLevel > this.level) {
+                        this.level = newLevel;
+                        this.levelText.setText(this.level);
+                        this.dropInterval = Math.max(100, 1000 - (this.level - 1) * 100);
+                    }
+                }
+
+                this.spawnNewPiece();
+                this.spawnNextPiece();
+                this.drawNextPiece();
+            }
+
+            clearLines() {
+                let linesCleared = 0;
+                for (let y = GRID_HEIGHT - 1; y >= 0; y--) {
+                    if (this.grid[y].every(cell => cell !== 0)) {
+                        this.grid.splice(y, 1);
+                        this.grid.unshift(Array(GRID_WIDTH).fill(0));
+                        linesCleared++;
+                        y++;
+                    }
+                }
+                return linesCleared;
+            }
+
+            showQuiz() {
+                this.quizActive = true;
+
+                let availableQuestions = QUIZ_QUESTIONS.filter((q, index) => !this.usedQuestions.includes(index));
+                if (availableQuestions.length === 0) {
+                    this.usedQuestions = [];
+                    availableQuestions = QUIZ_QUESTIONS;
+                }
+                
+                const questionIndex = QUIZ_QUESTIONS.indexOf(availableQuestions[Math.floor(Math.random() * availableQuestions.length)]);
+                this.usedQuestions.push(questionIndex);
+                const question = QUIZ_QUESTIONS[questionIndex];
+
+                const overlay = this.add.rectangle(
+                    GAME_WIDTH / 2,
+                    GAME_HEIGHT / 2,
+                    GAME_WIDTH - 40,
+                    400,
+                    0x1a1a2e,
+                    0.98
+                ).setStrokeStyle(4, 0x667eea);
+
+                const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 170, 'PHOENICIAN QUIZ!', {
+                    fontSize: '28px',
+                    fontStyle: 'bold',
+                    color: '#667eea'
+                }).setOrigin(0.5);
+
+                const questionText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, question.question, {
+                    fontSize: '18px',
+                    color: '#ffffff',
+                    wordWrap: { width: GAME_WIDTH - 100 },
+                    align: 'center'
+                }).setOrigin(0.5);
+
+                const buttons = [];
+                const buttonY = GAME_HEIGHT / 2 - 40;
+                
+                question.answers.forEach((answer, index) => {
+                    const y = buttonY + (index * 70);
+                    
+                    const button = this.add.rectangle(
+                        GAME_WIDTH / 2,
+                        y,
+                        GAME_WIDTH - 100,
+                        55,
+                        0x2a2a3e
+                    ).setInteractive().setStrokeStyle(2, 0x667eea);
+
+                    const answerText = this.add.text(GAME_WIDTH / 2, y, answer, {
+                        fontSize: '16px',
+                        color: '#ffffff',
+                        wordWrap: { width: GAME_WIDTH - 120 },
+                        align: 'center'
+                    }).setOrigin(0.5);
+
+                    button.on('pointerover', () => {
+                        button.setFillStyle(0x3a3a4e);
+                    });
+
+                    button.on('pointerout', () => {
+                        button.setFillStyle(0x2a2a3e);
+                    });
+
+                    button.on('pointerdown', () => {
+                        this.handleAnswer(index === question.correct, overlay, title, questionText, buttons, answerText);
+                    });
+
+                    buttons.push({ button, text: answerText });
+                });
+
+                this.quizOverlay = { overlay, title, questionText, buttons };
+            }
+
+            handleAnswer(correct, overlay, title, questionText, buttons, selectedText) {
+                buttons.forEach(({ button, text }) => {
+                    button.disableInteractive();
+                    button.setFillStyle(0x2a2a3e);
+                });
+
+                if (correct) {
+                    selectedText.setColor('#00ff00');
+                    title.setText('CORRECT! ✓');
+                    title.setColor('#00ff00');
+                    
+                    this.removeTopLine();
+                    
+                    // Send attack in multiplayer
+                    if (this.isMultiplayer) {
+                        this.sendAttack(1);
+                    }
+                    
+                    const feedback = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 160, 
+                        this.isMultiplayer ? 'Line removed + 1 attack sent!' : 'Top line removed!', {
+                        fontSize: '18px',
+                        color: '#00ff00',
+                        fontStyle: 'bold'
+                    }).setOrigin(0.5);
+
+                    this.time.delayedCall(2000, () => {
+                        overlay.destroy();
+                        title.destroy();
+                        questionText.destroy();
+                        feedback.destroy();
+                        buttons.forEach(({ button, text }) => {
+                            button.destroy();
+                            text.destroy();
+                        });
+                        this.quizActive = false;
+                    });
+                } else {
+                    selectedText.setColor('#ff0000');
+                    title.setText('INCORRECT! ✗');
+                    title.setColor('#ff0000');
+                    
+                    this.addDummyLines(2);
+                    
+                    const feedback = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 160, '2 penalty lines added!', {
+                        fontSize: '18px',
+                        color: '#ff0000',
+                        fontStyle: 'bold'
+                    }).setOrigin(0.5);
+
+                    this.time.delayedCall(2000, () => {
+                        overlay.destroy();
+                        title.destroy();
+                        questionText.destroy();
+                        feedback.destroy();
+                        buttons.forEach(({ button, text }) => {
+                            button.destroy();
+                            text.destroy();
+                        });
+                        this.quizActive = false;
+                    });
+                }
+            }
+
+            removeTopLine() {
+                for (let y = 0; y < GRID_HEIGHT; y++) {
+                    if (this.grid[y].some(cell => cell !== 0)) {
+                        this.grid.splice(y, 1);
+                        this.grid.unshift(Array(GRID_WIDTH).fill(0));
+                        break;
+                    }
+                }
+            }
+
+            addDummyLines(count) {
+                for (let i = 0; i < count; i++) {
+                    this.grid.shift();
+                    
+                    const newLine = Array(GRID_WIDTH).fill(0);
+                    const gapPositions = [];
+                    
+                    const numGaps = Math.floor(Math.random() * 2) + 2;
+                    while (gapPositions.length < numGaps) {
+                        const pos = Math.floor(Math.random() * GRID_WIDTH);
+                        if (!gapPositions.includes(pos)) {
+                            gapPositions.push(pos);
+                        }
+                    }
+                    
+                    const colorValues = Object.values(COLORS);
+                    for (let x = 0; x < GRID_WIDTH; x++) {
+                        if (!gapPositions.includes(x)) {
+                            newLine[x] = colorValues[Math.floor(Math.random() * colorValues.length)];
+                        }
+                    }
+                    
+                    this.grid.push(newLine);
+                }
+            }
+
+            render() {
+                for (let y = 0; y < GRID_HEIGHT; y++) {
+                    for (let x = 0; x < GRID_WIDTH; x++) {
+                        if (this.gridGraphics[y][x]) {
+                            this.gridGraphics[y][x].destroy();
+                            this.gridGraphics[y][x] = null;
+                        }
+                    }
+                }
+
+                for (let y = 0; y < GRID_HEIGHT; y++) {
+                    for (let x = 0; x < GRID_WIDTH; x++) {
+                        if (this.grid[y][x]) {
+                            this.gridGraphics[y][x] = this.add.rectangle(
+                                x * BLOCK_SIZE + BLOCK_SIZE / 2,
+                                y * BLOCK_SIZE + BLOCK_SIZE / 2,
+                                BLOCK_SIZE - 2,
+                                BLOCK_SIZE - 2,
+                                this.grid[y][x]
+                            );
+                        }
+                    }
+                }
+
+                if (this.currentPiece) {
+                    this.currentPiece.shape.forEach((row, y) => {
+                        row.forEach((cell, x) => {
+                            if (cell) {
+                                const gridY = this.currentPiece.y + y;
+                                const gridX = this.currentPiece.x + x;
+                                if (gridY >= 0 && gridY < GRID_HEIGHT && gridX >= 0 && gridX < GRID_WIDTH) {
+                                    this.gridGraphics[gridY][gridX] = this.add.rectangle(
+                                        gridX * BLOCK_SIZE + BLOCK_SIZE / 2,
+                                        gridY * BLOCK_SIZE + BLOCK_SIZE / 2,
+                                        BLOCK_SIZE - 2,
+                                        BLOCK_SIZE - 2,
+                                        this.currentPiece.color
+                                    );
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+
+            pauseGame() {
+                this.paused = !this.paused;
+                // Could add pause overlay here
+            }
+
+            async endGame() {
+                this.gameOver = true;
+                
+                // Save to leaderboard
+                if (this.score > 0) {
+                    await database.ref('leaderboard').push({
+                        name: this.playerName,
+                        score: this.score,
+                        timestamp: Date.now()
+                    });
+                }
+
+                // Update room if multiplayer
+                if (this.isMultiplayer && this.gameStateRef) {
+                    await this.gameStateRef.update({ alive: false });
+                }
+                
+                const overlay = this.add.rectangle(
+                    GAME_WIDTH / 2,
+                    GAME_HEIGHT / 2,
+                    GAME_WIDTH,
+                    GAME_HEIGHT,
+                    0x000000,
+                    0.7
+                );
+
+                this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'GAME OVER', {
+                    fontSize: '48px',
+                    fontStyle: 'bold',
+                    color: '#ff0000'
+                }).setOrigin(0.5);
+
+                this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, `Final Score: ${Math.floor(this.score)}`, {
+                    fontSize: '24px',
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+
+                this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Click to return to menu', {
+                    fontSize: '18px',
+                    color: '#aaaaaa'
+                }).setOrigin(0.5);
+
+                this.input.once('pointerdown', () => {
+                    if (this.roomRef) this.roomRef.off();
+                    if (this.gameStateRef) this.gameStateRef.off();
+                    this.scene.start('TitleScreen');
+                });
+            }
+        }
+
+        const config = {
+            type: Phaser.AUTO,
+            width: GAME_WIDTH,
+            height: GAME_HEIGHT,
+            parent: 'game-container',
+            scene: [TitleScreen, LobbyScene, LeaderboardScene, TetrisGame],
+            backgroundColor: '#1a1a2e',
+            dom: {
+                createContainer: true
+            }
+        };
+
+        const game = new Phaser.Game(config);
+    </script>
+</body>
+</html>
