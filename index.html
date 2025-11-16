@@ -24,6 +24,7 @@
     #top-bar {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       padding: 8px 16px;
       background: rgba(0,0,0,0.85);
       color: #fff;
@@ -33,16 +34,27 @@
     }
     #hud {
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
     #hud strong {
       color: #ffcc00;
+    }
+    #bgm-toggle {
+      cursor: pointer;
+      color: #90caf9;
+    }
+    #bgm-toggle:hover {
+      text-decoration: underline;
     }
     #content {
       flex: 1;
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      gap: 30px;
+      gap: 20px;
       padding: 20px;
       box-sizing: border-box;
     }
@@ -52,7 +64,7 @@
       background: #000;
     }
     #leaderboard {
-      width: 280px;
+      width: 240px;
       background: rgba(5, 5, 15, 0.95);
       color: #fff;
       border: 2px solid #555;
@@ -69,6 +81,37 @@
       text-transform: uppercase;
       color: #ffcc00;
       text-shadow: 0 0 6px #ff9800;
+    }
+
+    /* Profile card with face + neon title */
+    #profile-card {
+      width: 220px;
+      background: rgba(5, 5, 20, 0.95);
+      color: #fff;
+      border: 2px solid #555;
+      padding: 10px;
+      font-size: 14px;
+      box-shadow: 0 0 20px #000;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .profile-title {
+      margin-bottom: 8px;
+      font-size: 20px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #ffcc00;
+      text-shadow:
+        0 0 6px #ff9800,
+        0 0 12px #ff9800,
+        0 0 16px #ff5722;
+      animation: titlePulse 1.4s infinite alternate;
+    }
+    #profile-face {
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(255,255,255,0.2);
     }
 
     .overlay {
@@ -88,7 +131,7 @@
       background: linear-gradient(145deg, #060614, #111122);
       padding: 20px 24px;
       border-radius: 12px;
-      max-width: 480px;
+      max-width: 520px;
       text-align: center;
       box-shadow: 0 0 25px #000, 0 0 40px rgba(0, 255, 255, 0.25);
       border: 2px solid #444;
@@ -105,7 +148,7 @@
         0 0 12px #ff9800,
         0 0 16px #ff5722;
     }
-    /* Pulsating neon title */
+    /* Pulsating neon title (reused for title + profile card) */
     #title-text {
       animation: titlePulse 1.4s infinite alternate;
     }
@@ -170,6 +213,62 @@
       font-weight: bold;
       box-shadow: 0 0 10px #ff9800;
     }
+    .copyright-text {
+      margin-top: 12px;
+      font-size: 11px;
+      opacity: 0.8;
+    }
+    #footer {
+      text-align: center;
+      padding: 4px 8px;
+      font-size: 11px;
+      background: rgba(0,0,0,0.9);
+      color: #ccc;
+      border-top: 1px solid #333;
+    }
+
+    /* Attack banner */
+    #attack-banner {
+      position: fixed;
+      top: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      background: rgba(200, 0, 0, 0.92);
+      border-radius: 6px;
+      border: 1px solid #ffaaaa;
+      font-size: 14px;
+      box-shadow: 0 0 12px #f44336;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease-out;
+      z-index: 9;
+    }
+    #attack-banner.visible {
+      opacity: 1;
+    }
+
+    /* Game over banner */
+    #game-over-banner {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 12px 20px;
+      background: rgba(0,0,0,0.9);
+      border-radius: 8px;
+      border: 2px solid #ff5252;
+      font-size: 24px;
+      text-shadow: 0 0 10px #ff5252;
+      box-shadow: 0 0 18px #000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease-out;
+      z-index: 12;
+    }
+    #game-over-banner.visible {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -183,6 +282,8 @@
     Shield: <span id="hud-shield">OFF</span>
     &nbsp;&nbsp;&nbsp;
     <strong>[E] Store</strong>
+    &nbsp;&nbsp;&nbsp;
+    <span id="bgm-toggle">[M] Music: ON</span>
   </div>
   <div>
     Room: <span id="hud-room"></span>
@@ -196,6 +297,15 @@
     <h3>Leaderboard</h3>
     <div id="leaderboard-body">Waiting for players...</div>
   </div>
+
+  <div id="profile-card">
+    <div class="profile-title">Battle Tetris</div>
+    <img id="profile-face" src="face.png" alt="Jason Slaughter">
+  </div>
+</div>
+
+<div id="footer">
+  Copyright 2025 Jason Slaughter PixelED Path, LLC
 </div>
 
 <!-- Start / Title overlay -->
@@ -211,6 +321,9 @@
     <button id="start-button" class="primary-btn">Start</button>
     <p style="margin-top:10px;font-size:12px;">
       Everyone with the same room code shares a leaderboard and can attack each other.
+    </p>
+    <p class="copyright-text">
+      Copyright 2025 Jason Slaughter PixelED Path, LLC
     </p>
   </div>
 </div>
@@ -240,9 +353,13 @@
   </div>
 </div>
 
+<!-- Attack + Game Over banners -->
+<div id="attack-banner"></div>
+<div id="game-over-banner">GAME OVER – Board Reset</div>
+
 <script>
   // ==========================
-  // 1. FIREBASE CONFIG (your project)
+  // 1. FIREBASE CONFIG
   // ==========================
   const firebaseConfig = {
     apiKey: "AIzaSyCclM56_skM11x7_qXW08eB2gx-n7T9tJY",
@@ -258,33 +375,210 @@
   const db = firebase.firestore();
 
   // ==========================
-  // 2. QUESTION BANK (swap with textbook questions)
+  // 2. QUESTION BANK (20 from Phoenicians text)
   // ==========================
-  const QUESTIONS = [
+  const BASE_QUESTIONS = [
     {
-      text: "Sample Question 1: 2 + 2 = ?",
-      options: ["1","2","3","4"],
-      correctIndex: 3
+      text: "Where did the Phoenician civilization begin?",
+      correct: "On a narrow Mediterranean coastal strip in present-day Lebanon",
+      wrong: [
+        "Deep in the Sahara Desert",
+        "In the Nile River valley of Egypt",
+        "On the plains between the Tigris and Euphrates Rivers"
+      ]
     },
     {
-      text: "Sample Question 2: Capital of France?",
-      options: ["Paris","London","Rome","Berlin"],
-      correctIndex: 0
+      text: "What type of political units made up Phoenicia?",
+      correct: "Independent city-states",
+      wrong: [
+        "A single united empire",
+        "Nomadic tribes",
+        "Democratic kingdoms"
+      ]
     },
     {
-      text: "Sample Question 3: The color of the sky is usually?",
-      options: ["Red","Blue","Green","Yellow"],
-      correctIndex: 1
+      text: "From which earlier people did Phoenician society develop?",
+      correct: "The Canaanites",
+      wrong: [
+        "The Assyrians",
+        "The Persians",
+        "The Hittites"
+      ]
+    },
+    {
+      text: "Which large civilization strongly influenced Canaan and sometimes controlled it?",
+      correct: "Egypt",
+      wrong: [
+        "India",
+        "China",
+        "Rome"
+      ]
+    },
+    {
+      text: "Why did geography push Phoenicians toward the sea?",
+      correct: "Mountainous land left little flat area for farming",
+      wrong: [
+        "Endless flat plains made farming too boring",
+        "They lived on islands with no land at all",
+        "Their rivers were too dangerous to cross"
+      ]
+    },
+    {
+      text: "What rare product made from sea snails made Phoenicia famous?",
+      correct: "Purple dye used to color cloth",
+      wrong: [
+        "Black ink for writing",
+        "Perfume oil for temples",
+        "Blue paint for pottery"
+      ]
+    },
+    {
+      text: "Which statement best describes Phoenician sailors?",
+      correct: "They were fearless navigators who dominated Mediterranean sea trade",
+      wrong: [
+        "They only sailed short distances along rivers",
+        "They avoided ocean travel and used only roads",
+        "They depended on other peoples to move their goods by sea"
+      ]
+    },
+    {
+      text: "What is an import?",
+      correct: "A good made in another country and brought in to be sold",
+      wrong: [
+        "A good produced in a country and sold to others",
+        "A tax charged on local merchants",
+        "A law that limits trade with neighbors"
+      ]
+    },
+    {
+      text: "What is an export?",
+      correct: "A good produced in a country and sold outside its borders",
+      wrong: [
+        "A good bought from another country",
+        "A type of ship used for sea travel",
+        "A list of trading rules"
+      ]
+    },
+    {
+      text: "Why did the Phoenicians trade so much with other cultures?",
+      correct: "They lacked many natural resources and needed raw materials",
+      wrong: [
+        "They wanted to avoid contact with all outsiders",
+        "They had no skills in manufacturing",
+        "Their religion forbade them from farming"
+      ]
+    },
+    {
+      text: "Which raw materials did Phoenicians often bring back as imports?",
+      correct: "Gold, silver, tin, copper, iron, ivory, and precious stones",
+      wrong: [
+        "Silk, tea, and gunpowder from Asia",
+        "Corn, potatoes, and tobacco from the Americas",
+        "Coal, steel, and plastic from Europe"
+      ]
+    },
+    {
+      text: "What is navigation?",
+      correct: "The art of steering a ship from place to place",
+      wrong: [
+        "The process of building stone temples",
+        "A law about how merchants must trade",
+        "The writing system used by priests"
+      ]
+    },
+    {
+      text: "Which evidence shows that Phoenicians were highly skilled sailors?",
+      correct: "They explored far across the Mediterranean and even into the Atlantic Ocean",
+      wrong: [
+        "They never left sight of their home ports",
+        "They only sailed short trips to one nearby island",
+        "They refused to trade with any foreign lands"
+      ]
+    },
+    {
+      text: "What is a colony?",
+      correct: "An area ruled by a distant country",
+      wrong: [
+        "A small independent kingdom",
+        "A ship used for long voyages",
+        "A temple in a city-state"
+      ]
+    },
+    {
+      text: "Why did many Phoenicians move to their colonies starting in the 800s BCE?",
+      correct: "They were fleeing attacks from the Assyrians and others",
+      wrong: [
+        "They were ordered to leave by their kings",
+        "They were searching for fertile river valleys in Mesopotamia",
+        "They were forced into slavery by the Egyptians"
+      ]
+    },
+    {
+      text: "Which Phoenician colony grew into a powerful city-state in North Africa?",
+      correct: "Carthage",
+      wrong: [
+        "Babylon",
+        "Memphis",
+        "Sparta"
+      ]
+    },
+    {
+      text: "What is cultural diffusion?",
+      correct: "The spreading of cultural traits from one region to another",
+      wrong: [
+        "The complete isolation of one culture from others",
+        "A written law code controlling trade",
+        "The process of building stone monuments"
+      ]
+    },
+    {
+      text: "How did the Phoenicians help spread culture around the Mediterranean?",
+      correct: "Through trade, they linked many peoples and passed on ideas and practices",
+      wrong: [
+        "By refusing to trade with any foreign groups",
+        "By destroying all cities they visited",
+        "By forcing everyone to speak only one language"
+      ]
+    },
+    {
+      text: "How was the Phoenician alphabet different from older cuneiform writing?",
+      correct: "It used a small set of symbols, each representing a single sound",
+      wrong: [
+        "It used thousands of picture symbols for entire words",
+        "It could only be carved into clay tablets",
+        "It was a secret code known only to kings"
+      ]
+    },
+    {
+      text: "Which later cultures adopted and changed the Phoenician alphabet?",
+      correct: "Greeks and Romans",
+      wrong: [
+        "Chinese and Japanese",
+        "Aztecs and Mayans",
+        "Incas and Egyptians"
+      ]
     }
-    // Add up to 20 questions here
   ];
+
+  let questionPool = [];
+  function resetQuestionPool() {
+    questionPool = BASE_QUESTIONS.map(q => ({ ...q, wrong: [...q.wrong] }));
+  }
+  resetQuestionPool();
+
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
 
   // ==========================
   // 3. GLOBAL VARS
   // ==========================
   const WIDTH = 10;
   const HEIGHT = 22;
-  const GRID = 32;  // bigger blocks / larger playfield
+  const GRID = 32;
 
   let board;
   let game;
@@ -295,7 +589,6 @@
   let coins = 0;
   let shieldActive = false;
 
-  let questionIndex = 0;
   let questionActive = false;
   let storeOpen = false;
 
@@ -305,15 +598,47 @@
   let keySpace;
   let keyE;
 
+  // horizontal move smoothing
+  let moveDir = 0;          // -1 left, 1 right, 0 none
+  let moveHoldTime = 0;
+  const MOVE_INITIAL_DELAY = 170; // ms before auto-repeat
+  const MOVE_REPEAT_DELAY  = 60;  // ms between repeats
+
   let playerName = "Player";
   let roomId = "Room1";
   let playerDocId = null;
 
   let currentPlayers = [];
 
-  // sound
-  let sfx = {};
-  let bgm;
+  // HTML5 Audio for SFX/BGM
+  const sfx = {
+    move:   new Audio("sounds/move.mp3"),
+    rotate: new Audio("sounds/rotate.mp3"),
+    drop:   new Audio("sounds/drop.mp3"),
+    line:   new Audio("sounds/line.mp3"),
+    attack: new Audio("sounds/attack.mp3"),
+    hit:    new Audio("sounds/hit.mp3")
+  };
+  sfx.move.volume = 0.25;
+  sfx.rotate.volume = 0.25;
+  sfx.drop.volume = 0.3;
+  sfx.line.volume = 0.35;
+  sfx.attack.volume = 0.4;
+  sfx.hit.volume = 0.4;
+
+  const bgm = new Audio("sounds/bgm.mp3");
+  bgm.loop = true;
+  bgm.volume = 0.25;
+  let musicEnabled = true;
+
+  function playSfx(name) {
+    const sound = sfx[name];
+    if (!sound) return;
+    try {
+      sound.currentTime = 0;
+      sound.play();
+    } catch (e) {}
+  }
 
   const hudName = document.getElementById('hud-name');
   const hudScore = document.getElementById('hud-score');
@@ -339,8 +664,41 @@
   const questionText = document.getElementById('question-text');
   const answersDiv = document.getElementById('answers');
 
-  function playSfx(name) {
-    if (sfx[name]) sfx[name].play();
+  const bgmToggle = document.getElementById('bgm-toggle');
+  const attackBanner = document.getElementById('attack-banner');
+  const gameOverBanner = document.getElementById('game-over-banner');
+
+  function updateBgmLabel() {
+    bgmToggle.textContent = musicEnabled ? "[M] Music: ON" : "[M] Music: OFF";
+  }
+  updateBgmLabel();
+
+  function toggleMusic() {
+    musicEnabled = !musicEnabled;
+    updateBgmLabel();
+    if (!musicEnabled) {
+      bgm.pause();
+    } else {
+      try { bgm.play(); } catch (e) {}
+    }
+  }
+  bgmToggle.onclick = toggleMusic;
+
+  function showAttackBanner(text) {
+    attackBanner.textContent = text;
+    attackBanner.classList.add('visible');
+    clearTimeout(showAttackBanner._timeoutId);
+    showAttackBanner._timeoutId = setTimeout(() => {
+      attackBanner.classList.remove('visible');
+    }, 3000);
+  }
+
+  function showGameOverBanner() {
+    gameOverBanner.classList.add('visible');
+    clearTimeout(showGameOverBanner._timeoutId);
+    showGameOverBanner._timeoutId = setTimeout(() => {
+      gameOverBanner.classList.remove('visible');
+    }, 2000);
   }
 
   // Start screen handler
@@ -353,6 +711,11 @@
     hudRoom.textContent = roomId;
 
     startOverlay.classList.add('hidden');
+
+    if (musicEnabled) {
+      try { bgm.play(); } catch (e) {}
+    }
+
     startGame();
   };
 
@@ -400,6 +763,18 @@
     }
   }
 
+  // gameOver reset when stack reaches top
+  function gameOver() {
+    if (!board) return;
+    board.backBoard.fill(0);
+    score = 0;
+    linesCleared = 0;
+    coins = 0;
+    shieldActive = false;
+    recalcScore();
+    showGameOverBanner();
+  }
+
   class Board {
     constructor() {
       this.width = WIDTH;
@@ -435,13 +810,9 @@
       this.currentY = 1;
       this.nextShape = this.randomShape();
 
+      // if we can't spawn, that means stack reached top -> game over & board cleared
       if (!this.tryMove(this.currentShape, this.currentDir, this.currentX, this.currentY)) {
-        this.backBoard.fill(0);
-        score = 0;
-        linesCleared = 0;
-        coins = 0;
-        shieldActive = false;
-        recalcScore();
+        gameOver();
       }
     }
     stepDown() {
@@ -529,7 +900,7 @@
     }
   }
 
-  // simple wall-kick rotate: try rotate in place, then x-1, then x+1
+  // simple wall-kick rotate
   function attemptRotate(delta) {
     if (!board || board.currentShape === SHAPES.NONE) return;
     const newDir = (board.currentDir + delta + 4) % 4;
@@ -556,7 +927,7 @@
   }
 
   // ==========================
-  // 5. START GAME (PHASER + LISTENERS)
+  // 5. START GAME (PHASER)
   // ==========================
   function startGame() {
     const config = {
@@ -577,31 +948,13 @@
   }
 
   function preload() {
-    // Audio assets (from /sounds)
-    this.load.audio('move',   'sounds/move.wav');
-    this.load.audio('rotate', 'sounds/rotate.wav');
-    this.load.audio('drop',   'sounds/drop.wav');
-    this.load.audio('line',   'sounds/line.wav');
-    this.load.audio('attack', 'sounds/attack.wav');
-    this.load.audio('hit',    'sounds/hit.wav');
-    this.load.audio('bgm',    'sounds/bgm.mp3');
+    // no Phaser audio assets; using HTML Audio
   }
 
   function create() {
     board = new Board();
     board.spawn();
     graphics = this.add.graphics();
-
-    // setup sounds
-    sfx.move   = this.sound.add('move',   { volume: 0.25 });
-    sfx.rotate = this.sound.add('rotate', { volume: 0.25 });
-    sfx.drop   = this.sound.add('drop',   { volume: 0.3 });
-    sfx.line   = this.sound.add('line',   { volume: 0.3 });
-    sfx.attack = this.sound.add('attack', { volume: 0.4 });
-    sfx.hit    = this.sound.add('hit',    { volume: 0.4 });
-
-    bgm = this.sound.add('bgm', { loop: true, volume: 0.18 });
-    if (bgm) bgm.play();
 
     cursors = this.input.keyboard.createCursorKeys();
     keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -622,16 +975,34 @@
             board.currentX--;
             playSfx('move');
           }
+          moveDir = -1;
+          moveHoldTime = 0;
           break;
         case 'ArrowRight':
           if (board.tryMove(board.currentShape, board.currentDir, board.currentX + 1, board.currentY)) {
             board.currentX++;
             playSfx('move');
           }
+          moveDir = 1;
+          moveHoldTime = 0;
           break;
         case 'ArrowUp':
           attemptRotate(1);
           break;
+        case 'KeyM':
+          toggleMusic();
+          break;
+      }
+    });
+
+    this.input.keyboard.on('keyup', (event) => {
+      if (event.code === 'ArrowLeft' && moveDir === -1) {
+        moveDir = 0;
+        moveHoldTime = 0;
+      }
+      if (event.code === 'ArrowRight' && moveDir === 1) {
+        moveDir = 0;
+        moveHoldTime = 0;
       }
     });
 
@@ -641,6 +1012,7 @@
       else openStore();
     });
 
+    // question every 60s
     this.time.addEvent({
       delay: 60000,
       loop: true,
@@ -666,6 +1038,22 @@
       dropTimer = 0;
       const lines = board.stepDown();
       if (lines > 0) onLinesCleared(lines);
+    }
+
+    // smooth horizontal auto-shift when holding left/right
+    if (moveDir !== 0 && board && board.currentShape !== SHAPES.NONE) {
+      moveHoldTime += delta;
+      if (moveHoldTime >= MOVE_INITIAL_DELAY) {
+        const newX = board.currentX + moveDir;
+        if (board.tryMove(board.currentShape, board.currentDir, newX, board.currentY)) {
+          board.currentX = newX;
+          playSfx('move');
+        }
+        moveHoldTime -= MOVE_REPEAT_DELAY;
+        if (moveHoldTime < MOVE_INITIAL_DELAY - MOVE_REPEAT_DELAY) {
+          moveHoldTime = MOVE_INITIAL_DELAY - MOVE_REPEAT_DELAY;
+        }
+      }
     }
 
     drawBoard();
@@ -780,14 +1168,25 @@
     const attack = doc.data();
     if (attack.resolved) return;
 
+    let msg;
     if (shieldActive) {
+      msg = `Blocked attack from ${attack.fromName}!`;
       shieldActive = false;
+      playSfx('hit');
       recalcScore();
     } else {
-      if (attack.type === 'garbage2') board.addGarbageLines(2);
-      if (attack.type === 'garbage4') board.addGarbageLines(4);
+      if (attack.type === 'garbage2') {
+        board.addGarbageLines(2);
+        msg = `${attack.fromName} hit you: +2 garbage lines!`;
+      } else if (attack.type === 'garbage4') {
+        board.addGarbageLines(4);
+        msg = `${attack.fromName} hit you HARD: +4 garbage lines!`;
+      } else {
+        msg = `Attack from ${attack.fromName}!`;
+      }
       playSfx('hit');
     }
+    showAttackBanner(msg);
     await doc.ref.update({ resolved: true });
   }
 
@@ -854,23 +1253,28 @@
   }
 
   // ==========================
-  // 9. QUIZ OVERLAY
+  // 9. QUIZ OVERLAY (random question + shuffled answers)
   // ==========================
   function askQuestion() {
     if (questionActive) return;
-    if (questionIndex >= QUESTIONS.length) return;
+    if (questionPool.length === 0) resetQuestionPool();
 
     questionActive = true;
-    const q = QUESTIONS[questionIndex++];
-    questionText.textContent = q.text;
+    const idx = Math.floor(Math.random() * questionPool.length);
+    const base = questionPool.splice(idx, 1)[0];
+
+    questionText.textContent = base.text;
     answersDiv.innerHTML = "";
 
-    q.options.forEach((opt, idx) => {
+    const options = [base.correct, ...base.wrong];
+    shuffleArray(options);
+
+    options.forEach(opt => {
       const btn = document.createElement('button');
       btn.className = 'answer-btn';
       btn.textContent = opt;
       btn.onclick = () => {
-        const correct = idx === q.correctIndex;
+        const correct = (opt === base.correct);
         if (correct) {
           board.clearTopFilledRow();
           coins += 3;
