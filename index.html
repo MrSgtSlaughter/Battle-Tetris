@@ -1,1307 +1,893 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Battle Tetris: Multiplayer Edition</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: 'Arial', sans-serif;
-        }
-        #game-container {
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Battle Tetris</title>
+
+  <!-- Phaser 3 -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+
+  <!-- Firebase (compat SDKs for easiest syntax) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #2a2a5a 0%, #111133 35%, #03030a 70%, #000 100%);
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+    #top-bar {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      font-size: 14px;
+      border-bottom: 2px solid #444;
+      box-shadow: 0 2px 8px #000;
+    }
+    #hud {
+      font-size: 14px;
+    }
+    #hud strong {
+      color: #ffcc00;
+    }
+    #content {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 30px;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    #game-container {
+      border: 3px solid #888;
+      box-shadow: 0 0 20px #000, 0 0 40px rgba(255, 152, 0, 0.2);
+      background: #000;
+    }
+    #leaderboard {
+      width: 280px;
+      background: rgba(5, 5, 15, 0.95);
+      color: #fff;
+      border: 2px solid #555;
+      padding: 10px;
+      font-size: 14px;
+      box-shadow: 0 0 20px #000;
+      border-radius: 8px;
+    }
+    #leaderboard h3 {
+      margin: 0 0 6px 0;
+      font-size: 18px;
+      text-align: center;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #ffcc00;
+      text-shadow: 0 0 6px #ff9800;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top, rgba(40,40,80,0.95), rgba(0,0,0,0.95));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 10;
+    }
+    .hidden {
+      display: none !important;
+    }
+    .overlay-box {
+      background: linear-gradient(145deg, #060614, #111122);
+      padding: 20px 24px;
+      border-radius: 12px;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: 0 0 25px #000, 0 0 40px rgba(0, 255, 255, 0.25);
+      border: 2px solid #444;
+    }
+    .overlay-box h1 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 32px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #ffcc00;
+      text-shadow:
+        0 0 6px #ff9800,
+        0 0 12px #ff9800,
+        0 0 16px #ff5722;
+    }
+    /* Pulsating neon title */
+    #title-text {
+      animation: titlePulse 1.4s infinite alternate;
+    }
+    @keyframes titlePulse {
+      from {
+        transform: scale(1);
+        text-shadow:
+          0 0 6px #ff9800,
+          0 0 12px #ff9800,
+          0 0 16px #ff5722;
+      }
+      to {
+        transform: scale(1.08);
+        text-shadow:
+          0 0 10px #ffeb3b,
+          0 0 20px #ffc107,
+          0 0 30px #ff5722;
+      }
+    }
+
+    .overlay-box h2 {
+      margin-top: 8px;
+      font-size: 20px;
+      color: #90caf9;
+    }
+    .overlay-box p {
+      font-size: 14px;
+    }
+    .overlay-box input {
+      width: 80%;
+      padding: 6px;
+      margin: 4px 0 10px 0;
+      border-radius: 4px;
+      border: 1px solid #555;
+      font-size: 14px;
+      background: #050514;
+      color: #fff;
+    }
+    .overlay-box button {
+      margin: 6px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .answer-btn {
+      background: #4caf50;
+      color: #fff;
+    }
+    .store-btn {
+      background: #2196f3;
+      color: #fff;
+    }
+    .close-btn {
+      background: #777;
+      color: #fff;
+    }
+    .primary-btn {
+      background: linear-gradient(90deg, #ff9800, #ffc107);
+      color: #000;
+      font-weight: bold;
+      box-shadow: 0 0 10px #ff9800;
+    }
+  </style>
 </head>
 <body>
-    <div id="game-container"></div>
-    
-    <script>
-        // Firebase Configuration - REPLACE WITH YOUR FIREBASE CONFIG
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
 
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+<div id="top-bar">
+  <div id="hud">
+    <span id="hud-name"></span> |
+    Score: <span id="hud-score">0</span> |
+    Lines: <span id="hud-lines">0</span> |
+    Coins: <span id="hud-coins">0</span> |
+    Shield: <span id="hud-shield">OFF</span>
+    &nbsp;&nbsp;&nbsp;
+    <strong>[E] Store</strong>
+  </div>
+  <div>
+    Room: <span id="hud-room"></span>
+  </div>
+</div>
 
-        const BLOCK_SIZE = 30;
-        const GRID_WIDTH = 10;
-        const GRID_HEIGHT = 20;
-        const GAME_WIDTH = BLOCK_SIZE * (GRID_WIDTH + 8);
-        const GAME_HEIGHT = BLOCK_SIZE * GRID_HEIGHT;
+<div id="content">
+  <div id="game-container"></div>
 
-        // Tetromino shapes
-        const SHAPES = {
-            I: [[1, 1, 1, 1]],
-            O: [[1, 1], [1, 1]],
-            T: [[0, 1, 0], [1, 1, 1]],
-            S: [[0, 1, 1], [1, 1, 0]],
-            Z: [[1, 1, 0], [0, 1, 1]],
-            J: [[1, 0, 0], [1, 1, 1]],
-            L: [[0, 0, 1], [1, 1, 1]]
-        };
+  <div id="leaderboard">
+    <h3>Leaderboard</h3>
+    <div id="leaderboard-body">Waiting for players...</div>
+  </div>
+</div>
 
-        const COLORS = {
-            I: 0x00f0f0,
-            O: 0xf0f000,
-            T: 0xa000f0,
-            S: 0x00f000,
-            Z: 0xf00000,
-            J: 0x0000f0,
-            L: 0xf0a000
-        };
+<!-- Start / Title overlay -->
+<div id="start-overlay" class="overlay">
+  <div class="overlay-box">
+    <h1 id="title-text">Battle Tetris</h1>
+    <p>Answer questions, clear lines, earn coins, and attack your classmates.</p>
+    <h2>Join Game</h2>
+    <input id="start-name" placeholder="Your name" />
+    <br>
+    <input id="start-room" placeholder="Room code (e.g., Hour1)" value="Room1" />
+    <br>
+    <button id="start-button" class="primary-btn">Start</button>
+    <p style="margin-top:10px;font-size:12px;">
+      Everyone with the same room code shares a leaderboard and can attack each other.
+    </p>
+  </div>
+</div>
 
-        // Quiz questions based on Phoenician civilization
-        const QUIZ_QUESTIONS = [
-            {
-                question: "Where was Phoenicia located?",
-                answers: [
-                    "Along the Mediterranean coast in what is now Lebanon",
-                    "In the heart of Mesopotamia",
-                    "On the Iberian Peninsula",
-                    "In ancient Egypt"
-                ],
-                correct: 0
-            },
-            {
-                question: "What color dye were the Phoenicians famous for making?",
-                answers: [
-                    "Red dye from beetles",
-                    "Blue dye from plants",
-                    "Purple dye from sea snails",
-                    "Yellow dye from flowers"
-                ],
-                correct: 2
-            },
-            {
-                question: "How many symbols were in the Phoenician alphabet?",
-                answers: [
-                    "10 symbols",
-                    "22 symbols",
-                    "50 symbols",
-                    "100 symbols"
-                ],
-                correct: 1
-            },
-            {
-                question: "What writing system did the Phoenicians improve upon?",
-                answers: [
-                    "Hieroglyphics",
-                    "Cuneiform",
-                    "Sanskrit",
-                    "Pictographs"
-                ],
-                correct: 1
-            },
-            {
-                question: "What famous Phoenician colony later fought three wars against Rome?",
-                answers: [
-                    "Tyre",
-                    "Sidon",
-                    "Carthage",
-                    "Byblos"
-                ],
-                correct: 2
-            },
-            {
-                question: "Why did Phoenicians turn to sea trade?",
-                answers: [
-                    "They had too much farmland",
-                    "Mountains left little flat land for farming",
-                    "Their king commanded it",
-                    "They were conquered by sailors"
-                ],
-                correct: 1
-            },
-            {
-                question: "What peoples did Phoenician society develop from?",
-                answers: [
-                    "The Sumerians",
-                    "The Egyptians",
-                    "The Canaanites",
-                    "The Romans"
-                ],
-                correct: 2
-            },
-            {
-                question: "What is an import?",
-                answers: [
-                    "A good produced and sold within a country",
-                    "A good sold within a country that is produced elsewhere",
-                    "A type of ship",
-                    "A trading route"
-                ],
-                correct: 1
-            },
-            {
-                question: "The word 'alphabet' comes from which two Greek letters?",
-                answers: [
-                    "Alpha and beta",
-                    "Alpha and gamma",
-                    "Beta and delta",
-                    "Alpha and omega"
-                ],
-                correct: 0
-            },
-            {
-                question: "What mountains formed Phoenicia's eastern border?",
-                answers: [
-                    "The Alps Mountains",
-                    "The Atlas Mountains",
-                    "The Lebanon Mountains",
-                    "The Zagros Mountains"
-                ],
-                correct: 2
-            },
-            {
-                question: "What did Phoenician colonies originally serve as?",
-                answers: [
-                    "Military forts",
-                    "Trading stations for ships",
-                    "Religious temples",
-                    "Prison colonies"
-                ],
-                correct: 1
-            },
-            {
-                question: "What precious metals did Phoenicians trade for in Iberia and West Africa?",
-                answers: [
-                    "Copper and bronze",
-                    "Iron and tin",
-                    "Silver and gold",
-                    "Platinum and titanium"
-                ],
-                correct: 2
-            }
-        ];
+<!-- Question overlay -->
+<div id="question-overlay" class="overlay hidden">
+  <div class="overlay-box">
+    <h2>Answer the question!</h2>
+    <div id="question-text" style="margin-bottom: 10px;"></div>
+    <div id="answers"></div>
+  </div>
+</div>
 
-        // Title Screen Scene
-        class TitleScreen extends Phaser.Scene {
-            constructor() {
-                super({ key: 'TitleScreen' });
-            }
+<!-- Store overlay -->
+<div id="store-overlay" class="overlay hidden">
+  <div class="overlay-box">
+    <h2>Store</h2>
+    <p>Use coins to attack or defend.</p>
+    <p><strong>Attacks (hit random opponent in your room):</strong></p>
+    <button class="store-btn" id="buy-garbage2">Garbage +2 (3 coins)</button>
+    <button class="store-btn" id="buy-garbage4">Garbage +4 (5 coins)</button>
+    <p><strong>Defense / Utility:</strong></p>
+    <button class="store-btn" id="buy-shield">Shield (next attack blocked) (4 coins)</button>
+    <button class="store-btn" id="buy-clear">Clear 2 bottom lines (5 coins)</button>
+    <br><br>
+    <button class="close-btn" id="store-close">Close Store (E)</button>
+  </div>
+</div>
 
-            create() {
-                const centerX = this.cameras.main.width / 2;
-                const centerY = this.cameras.main.height / 2;
+<script>
+  // ==========================
+  // 1. FIREBASE CONFIG (your project)
+  // ==========================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCclM56_skM11x7_qXW08eB2gx-n7T9tJY",
+    authDomain: "battle-tetris-2c247.firebaseapp.com",
+    projectId: "battle-tetris-2c247",
+    storageBucket: "battle-tetris-2c247.firebasestorage.app",
+    messagingSenderId: "275712305914",
+    appId: "1:275712305914:web:b5115418725f5703163743",
+    measurementId: "G-ZQBZYEY1EK"
+  };
 
-                // Background
-                this.cameras.main.setBackgroundColor('#1a1a2e');
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-                // Animated background blocks
-                this.createFloatingBlocks();
+  // ==========================
+  // 2. QUESTION BANK (swap with textbook questions)
+  // ==========================
+  const QUESTIONS = [
+    {
+      text: "Sample Question 1: 2 + 2 = ?",
+      options: ["1","2","3","4"],
+      correctIndex: 3
+    },
+    {
+      text: "Sample Question 2: Capital of France?",
+      options: ["Paris","London","Rome","Berlin"],
+      correctIndex: 0
+    },
+    {
+      text: "Sample Question 3: The color of the sky is usually?",
+      options: ["Red","Blue","Green","Yellow"],
+      correctIndex: 1
+    }
+    // Add up to 20 questions here
+  ];
 
-                // Title
-                const title = this.add.text(centerX, centerY - 200, 'BATTLE TETRIS', {
-                    fontSize: '64px',
-                    fontStyle: 'bold',
-                    color: '#ffffff',
-                    stroke: '#667eea',
-                    strokeThickness: 6
-                }).setOrigin(0.5);
+  // ==========================
+  // 3. GLOBAL VARS
+  // ==========================
+  const WIDTH = 10;
+  const HEIGHT = 22;
+  const GRID = 32;  // bigger blocks / larger playfield
 
-                const subtitle = this.add.text(centerX, centerY - 140, 'Multiplayer Edition', {
-                    fontSize: '32px',
-                    fontStyle: 'italic',
-                    color: '#667eea'
-                }).setOrigin(0.5);
+  let board;
+  let game;
+  let graphics;
 
-                // Player name input
-                this.add.text(centerX, centerY - 60, 'Enter Your Name:', {
-                    fontSize: '20px',
-                    color: '#ffffff'
-                }).setOrigin(0.5);
+  let score = 0;
+  let linesCleared = 0;
+  let coins = 0;
+  let shieldActive = false;
 
-                const nameInput = this.add.dom(centerX, centerY - 20, 'input', {
-                    type: 'text',
-                    placeholder: 'Player Name',
-                    maxLength: '15',
-                    fontSize: '18px',
-                    padding: '10px',
-                    width: '250px',
-                    borderRadius: '5px',
-                    border: '2px solid #667eea',
-                    textAlign: 'center',
-                    backgroundColor: '#2a2a3e',
-                    color: '#ffffff'
-                });
+  let questionIndex = 0;
+  let questionActive = false;
+  let storeOpen = false;
 
-                // Buttons
-                const playButton = this.createButton(centerX, centerY + 40, 'PLAY SOLO', () => {
-                    const name = nameInput.node.value.trim() || 'Player';
-                    this.scene.start('TetrisGame', { playerName: name, multiplayer: false });
-                });
+  let dropTimer = 0;
+  let dropInterval = 500;
+  let cursors;
+  let keySpace;
+  let keyE;
 
-                const multiplayerButton = this.createButton(centerX, centerY + 110, 'JOIN MULTIPLAYER', () => {
-                    const name = nameInput.node.value.trim() || 'Player';
-                    this.scene.start('LobbyScene', { playerName: name });
-                });
+  let playerName = "Player";
+  let roomId = "Room1";
+  let playerDocId = null;
 
-                const leaderboardButton = this.createButton(centerX, centerY + 180, 'LEADERBOARD', () => {
-                    this.scene.start('LeaderboardScene');
-                });
+  let currentPlayers = [];
 
-                // Instructions
-                this.add.text(centerX, centerY + 250, 'Clear lines to attack opponents! Answer quiz questions for power-ups!', {
-                    fontSize: '14px',
-                    color: '#aaaaaa',
-                    align: 'center',
-                    wordWrap: { width: 500 }
-                }).setOrigin(0.5);
+  // sound
+  let sfx = {};
+  let bgm;
 
-                // Copyright
-                this.add.text(centerX, this.cameras.main.height - 30, '© Jason Slaughter - PixelED Path, LLC', {
-                    fontSize: '14px',
-                    color: '#888888'
-                }).setOrigin(0.5);
+  const hudName = document.getElementById('hud-name');
+  const hudScore = document.getElementById('hud-score');
+  const hudLines = document.getElementById('hud-lines');
+  const hudCoins = document.getElementById('hud-coins');
+  const hudShield = document.getElementById('hud-shield');
+  const hudRoom = document.getElementById('hud-room');
+  const leaderboardBody = document.getElementById('leaderboard-body');
 
-                // Pulse animation for title
-                this.tweens.add({
-                    targets: title,
-                    scale: 1.05,
-                    duration: 1000,
-                    yoyo: true,
-                    repeat: -1,
-                    ease: 'Sine.easeInOut'
-                });
-            }
+  const startOverlay = document.getElementById('start-overlay');
+  const startNameInput = document.getElementById('start-name');
+  const startRoomInput = document.getElementById('start-room');
+  const startButton = document.getElementById('start-button');
 
-            createButton(x, y, text, callback) {
-                const button = this.add.rectangle(x, y, 300, 50, 0x667eea)
-                    .setInteractive()
-                    .setStrokeStyle(2, 0xffffff);
+  const storeOverlay = document.getElementById('store-overlay');
+  const btnGarbage2 = document.getElementById('buy-garbage2');
+  const btnGarbage4 = document.getElementById('buy-garbage4');
+  const btnShield = document.getElementById('buy-shield');
+  const btnClear = document.getElementById('buy-clear');
+  const btnStoreClose = document.getElementById('store-close');
 
-                const buttonText = this.add.text(x, y, text, {
-                    fontSize: '20px',
-                    fontStyle: 'bold',
-                    color: '#ffffff'
-                }).setOrigin(0.5);
+  const questionOverlay = document.getElementById('question-overlay');
+  const questionText = document.getElementById('question-text');
+  const answersDiv = document.getElementById('answers');
 
-                button.on('pointerover', () => {
-                    button.setFillStyle(0x7a8ef5);
-                });
+  function playSfx(name) {
+    if (sfx[name]) sfx[name].play();
+  }
 
-                button.on('pointerout', () => {
-                    button.setFillStyle(0x667eea);
-                });
+  // Start screen handler
+  startButton.onclick = () => {
+    playerName = (startNameInput.value || "Anonymous").trim();
+    roomId = (startRoomInput.value || "Room1").trim();
+    playerDocId = playerName + "_" + Math.floor(Math.random() * 1000000);
 
-                button.on('pointerdown', callback);
+    hudName.textContent = playerName;
+    hudRoom.textContent = roomId;
 
-                return { button, text: buttonText };
-            }
+    startOverlay.classList.add('hidden');
+    startGame();
+  };
 
-            createFloatingBlocks() {
-                const colors = Object.values(COLORS);
-                for (let i = 0; i < 15; i++) {
-                    const x = Math.random() * this.cameras.main.width;
-                    const y = Math.random() * this.cameras.main.height;
-                    const block = this.add.rectangle(x, y, 20, 20, colors[Math.floor(Math.random() * colors.length)], 0.3);
-                    
-                    this.tweens.add({
-                        targets: block,
-                        y: y + (Math.random() * 200 - 100),
-                        x: x + (Math.random() * 200 - 100),
-                        duration: 3000 + Math.random() * 2000,
-                        yoyo: true,
-                        repeat: -1,
-                        ease: 'Sine.easeInOut'
-                    });
-                }
-            }
+  // ==========================
+  // 4. TETRIS LOGIC
+  // ==========================
+  const SHAPES = {
+    NONE: 0,
+    I: 1,
+    L: 2,
+    J: 3,
+    T: 4,
+    O: 5,
+    S: 6,
+    Z: 7
+  };
+
+  const SHAPE_COORDS = {
+    [SHAPES.NONE]: [[0,0],[0,0],[0,0],[0,0]],
+    [SHAPES.I]:    [[0,-1],[0,0],[0,1],[0,2]],
+    [SHAPES.L]:    [[0,-1],[0,0],[0,1],[1,1]],
+    [SHAPES.J]:    [[0,-1],[0,0],[0,1],[-1,1]],
+    [SHAPES.T]:    [[0,-1],[0,0],[0,1],[1,0]],
+    [SHAPES.O]:    [[0,0],[0,-1],[1,0],[1,-1]],
+    [SHAPES.S]:    [[0,0],[0,-1],[-1,0],[1,-1]],
+    [SHAPES.Z]:    [[0,0],[0,-1],[1,0],[-1,-1]]
+  };
+
+  function rotatedOffsets(shape, dir) {
+    const coords = SHAPE_COORDS[shape];
+    if (dir === 0 || shape === SHAPES.O) return coords;
+
+    if (dir === 1) {
+      return coords.map(([x,y]) => [-y, x]);
+    }
+    if (dir === 2) {
+      if ([SHAPES.I, SHAPES.Z, SHAPES.S].includes(shape)) return coords;
+      return coords.map(([x,y]) => [-x, -y]);
+    }
+    if (dir === 3) {
+      if ([SHAPES.I, SHAPES.Z, SHAPES.S].includes(shape)) {
+        return coords.map(([x,y]) => [-y, x]);
+      }
+      return coords.map(([x,y]) => [y, -x]);
+    }
+  }
+
+  class Board {
+    constructor() {
+      this.width = WIDTH;
+      this.height = HEIGHT;
+      this.backBoard = new Array(WIDTH * HEIGHT).fill(0);
+      this.currentShape = SHAPES.NONE;
+      this.currentX = -1;
+      this.currentY = -1;
+      this.currentDir = 0;
+      this.nextShape = this.randomShape();
+    }
+    randomShape() {
+      return 1 + Math.floor(Math.random() * 7);
+    }
+    value(x,y) {
+      return this.backBoard[x + y * this.width];
+    }
+    coords(shape, dir, x, y) {
+      return rotatedOffsets(shape, dir).map(([dx,dy]) => [x + dx, y + dy]);
+    }
+    tryMove(shape, dir, x, y) {
+      for (const [xx, yy] of this.coords(shape, dir, x, y)) {
+        if (xx < 0 || xx >= this.width || yy < 0 || yy >= this.height) return false;
+        if (this.backBoard[xx + yy * this.width] > 0) return false;
+      }
+      return true;
+    }
+    spawn() {
+      const shape = this.nextShape;
+      this.currentShape = shape;
+      this.currentDir = 0;
+      this.currentX = 5;
+      this.currentY = 1;
+      this.nextShape = this.randomShape();
+
+      if (!this.tryMove(this.currentShape, this.currentDir, this.currentX, this.currentY)) {
+        this.backBoard.fill(0);
+        score = 0;
+        linesCleared = 0;
+        coins = 0;
+        shieldActive = false;
+        recalcScore();
+      }
+    }
+    stepDown() {
+      if (this.tryMove(this.currentShape, this.currentDir, this.currentX, this.currentY + 1)) {
+        this.currentY++;
+        return 0;
+      }
+      this.merge();
+      const lines = this.removeFullLines();
+      this.spawn();
+      return lines;
+    }
+    dropDown() {
+      while (this.tryMove(this.currentShape, this.currentDir, this.currentX, this.currentY + 1)) {
+        this.currentY++;
+      }
+      this.merge();
+      const lines = this.removeFullLines();
+      this.spawn();
+      return lines;
+    }
+    merge() {
+      for (const [x,y] of this.coords(this.currentShape, this.currentDir, this.currentX, this.currentY)) {
+        this.backBoard[x + y * this.width] = this.currentShape;
+      }
+      this.currentShape = SHAPES.NONE;
+    }
+    removeFullLines() {
+      let lines = 0;
+      const newBoard = new Array(this.width * this.height).fill(0);
+      let newY = this.height - 1;
+      for (let y = this.height - 1; y >= 0; y--) {
+        let count = 0;
+        for (let x = 0; x < this.width; x++) {
+          if (this.backBoard[x + y * this.width] > 0) count++;
         }
-
-        // Lobby Scene
-        class LobbyScene extends Phaser.Scene {
-            constructor() {
-                super({ key: 'LobbyScene' });
-            }
-
-            init(data) {
-                this.playerName = data.playerName;
-            }
-
-            create() {
-                this.cameras.main.setBackgroundColor('#1a1a2e');
-                const centerX = this.cameras.main.width / 2;
-
-                this.add.text(centerX, 50, 'MULTIPLAYER LOBBY', {
-                    fontSize: '36px',
-                    fontStyle: 'bold',
-                    color: '#ffffff'
-                }).setOrigin(0.5);
-
-                this.add.text(centerX, 120, 'Searching for opponents...', {
-                    fontSize: '20px',
-                    color: '#aaaaaa'
-                }).setOrigin(0.5);
-
-                this.playersList = this.add.text(centerX, 200, '', {
-                    fontSize: '18px',
-                    color: '#ffffff',
-                    align: 'center'
-                }).setOrigin(0.5);
-
-                // Create or join a game room
-                this.setupMultiplayer();
-
-                // Back button
-                this.createButton(centerX, 500, 'BACK TO MENU', () => {
-                    if (this.roomRef) {
-                        this.roomRef.off();
-                    }
-                    this.scene.start('TitleScreen');
-                });
-            }
-
-            async setupMultiplayer() {
-                // Find available room or create new one
-                const roomsRef = database.ref('rooms');
-                const snapshot = await roomsRef.once('value');
-                const rooms = snapshot.val() || {};
-
-                let roomId = null;
-                
-                // Look for available room (less than 4 players)
-                for (let id in rooms) {
-                    const playerCount = rooms[id].players ? Object.keys(rooms[id].players).length : 0;
-                    if (playerCount < 4 && rooms[id].status === 'waiting') {
-                        roomId = id;
-                        break;
-                    }
-                }
-
-                // Create new room if none available
-                if (!roomId) {
-                    roomId = database.ref('rooms').push().key;
-                    await database.ref(`rooms/${roomId}`).set({
-                        status: 'waiting',
-                        createdAt: Date.now()
-                    });
-                }
-
-                this.roomId = roomId;
-                this.playerId = database.ref(`rooms/${roomId}/players`).push().key;
-
-                // Join room
-                await database.ref(`rooms/${roomId}/players/${this.playerId}`).set({
-                    name: this.playerName,
-                    score: 0,
-                    alive: true
-                });
-
-                // Listen for room updates
-                this.roomRef = database.ref(`rooms/${roomId}`);
-                this.roomRef.on('value', (snapshot) => {
-                    const room = snapshot.val();
-                    if (room && room.players) {
-                        const players = Object.values(room.players);
-                        this.playersList.setText(`Players in lobby:\n${players.map(p => p.name).join('\n')}`);
-
-                        // Start game when 2+ players
-                        if (players.length >= 2 && room.status === 'waiting') {
-                            database.ref(`rooms/${roomId}/status`).set('playing');
-                            this.roomRef.off();
-                            this.scene.start('TetrisGame', {
-                                playerName: this.playerName,
-                                multiplayer: true,
-                                roomId: this.roomId,
-                                playerId: this.playerId
-                            });
-                        }
-                    }
-                });
-            }
-
-            createButton(x, y, text, callback) {
-                const button = this.add.rectangle(x, y, 250, 50, 0x667eea)
-                    .setInteractive()
-                    .setStrokeStyle(2, 0xffffff);
-
-                const buttonText = this.add.text(x, y, text, {
-                    fontSize: '18px',
-                    fontStyle: 'bold',
-                    color: '#ffffff'
-                }).setOrigin(0.5);
-
-                button.on('pointerover', () => button.setFillStyle(0x7a8ef5));
-                button.on('pointerout', () => button.setFillStyle(0x667eea));
-                button.on('pointerdown', callback);
-
-                return { button, text: buttonText };
-            }
+        if (count < this.width) {
+          for (let x = 0; x < this.width; x++) {
+            newBoard[x + newY * this.width] = this.backBoard[x + y * this.width];
+          }
+          newY--;
+        } else {
+          lines++;
         }
-
-        // Leaderboard Scene
-        class LeaderboardScene extends Phaser.Scene {
-            constructor() {
-                super({ key: 'LeaderboardScene' });
-            }
-
-            create() {
-                this.cameras.main.setBackgroundColor('#1a1a2e');
-                const centerX = this.cameras.main.width / 2;
-
-                this.add.text(centerX, 50, 'TOP PLAYERS', {
-                    fontSize: '36px',
-                    fontStyle: 'bold',
-                    color: '#ffffff'
-                }).setOrigin(0.5);
-
-                this.leaderboardText = this.add.text(centerX, 150, 'Loading...', {
-                    fontSize: '18px',
-                    color: '#ffffff',
-                    align: 'left'
-                }).setOrigin(0.5, 0);
-
-                this.loadLeaderboard();
-
-                // Back button
-                this.createButton(centerX, 550, 'BACK TO MENU', () => {
-                    this.scene.start('TitleScreen');
-                });
-            }
-
-            async loadLeaderboard() {
-                const leaderboardRef = database.ref('leaderboard').orderByChild('score').limitToLast(10);
-                const snapshot = await leaderboardRef.once('value');
-                const scores = [];
-
-                snapshot.forEach((child) => {
-                    scores.push(child.val());
-                });
-
-                scores.reverse(); // Highest first
-
-                if (scores.length === 0) {
-                    this.leaderboardText.setText('No scores yet!\nBe the first to play!');
-                } else {
-                    let text = '';
-                    scores.forEach((score, index) => {
-                        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-                        text += `${medal} ${score.name.padEnd(15)} ${score.score.toString().padStart(8)}\n`;
-                    });
-                    this.leaderboardText.setText(text);
-                    this.leaderboardText.setFontFamily('monospace');
-                }
-            }
-
-            createButton(x, y, text, callback) {
-                const button = this.add.rectangle(x, y, 250, 50, 0x667eea)
-                    .setInteractive()
-                    .setStrokeStyle(2, 0xffffff);
-
-                const buttonText = this.add.text(x, y, text, {
-                    fontSize: '18px',
-                    fontStyle: 'bold',
-                    color: '#ffffff'
-                }).setOrigin(0.5);
-
-                button.on('pointerover', () => button.setFillStyle(0x7a8ef5));
-                button.on('pointerout', () => button.setFillStyle(0x667eea));
-                button.on('pointerdown', callback);
-
-                return { button, text: buttonText };
-            }
+      }
+      this.backBoard = newBoard;
+      return lines;
+    }
+    clearTopFilledRow() {
+      for (let y = 0; y < this.height; y++) {
+        let any = false;
+        for (let x = 0; x < this.width; x++) {
+          if (this.backBoard[x + y * this.width] > 0) {
+            any = true;
+            break;
+          }
         }
-
-        // Main Tetris Game Scene
-        class TetrisGame extends Phaser.Scene {
-            constructor() {
-                super({ key: 'TetrisGame' });
-            }
-
-            init(data) {
-                this.playerName = data.playerName;
-                this.isMultiplayer = data.multiplayer;
-                this.roomId = data.roomId;
-                this.playerId = data.playerId;
-            }
-
-            create() {
-                // Initialize game state
-                this.grid = Array(GRID_HEIGHT).fill(null).map(() => Array(GRID_WIDTH).fill(0));
-                this.gridGraphics = Array(GRID_HEIGHT).fill(null).map(() => Array(GRID_WIDTH).fill(null));
-                this.score = 0;
-                this.level = 1;
-                this.lines = 0;
-                this.gameOver = false;
-                this.dropTimer = 0;
-                this.dropInterval = 1000;
-                this.fastDrop = false;
-                this.combo = 0;
-                this.lastClearTime = 0;
-
-                // Quiz system
-                this.quizTimer = 0;
-                this.quizInterval = 40000; // 40 seconds
-                this.quizActive = false;
-                this.quizOverlay = null;
-                this.usedQuestions = [];
-
-                // Multiplayer
-                this.opponents = {};
-                this.incomingAttack = 0;
-
-                // Create graphics
-                this.cameras.main.setBackgroundColor('#1a1a2e');
-                
-                // Draw main player grid
-                this.createMainGrid();
-
-                // UI Panel
-                const panelX = BLOCK_SIZE * GRID_WIDTH + 20;
-                
-                this.add.text(panelX, 30, this.playerName, {
-                    fontSize: '20px',
-                    fontStyle: 'bold',
-                    color: '#667eea'
-                });
-
-                this.add.text(panelX, 70, 'SCORE', {
-                    fontSize: '18px',
-                    color: '#aaaaaa'
-                });
-                this.scoreText = this.add.text(panelX, 95, '0', {
-                    fontSize: '24px',
-                    fontStyle: 'bold',
-                    color: '#ffffff'
-                });
-
-                this.add.text(panelX, 150, 'LINES', {
-                    fontSize: '18px',
-                    color: '#aaaaaa'
-                });
-                this.linesText = this.add.text(panelX, 175, '0', {
-                    fontSize: '24px',
-                    fontStyle: 'bold',
-                    color: '#ffffff'
-                });
-
-                this.add.text(panelX, 230, 'LEVEL', {
-                    fontSize: '18px',
-                    color: '#aaaaaa'
-                });
-                this.levelText = this.add.text(panelX, 255, '1', {
-                    fontSize: '24px',
-                    fontStyle: 'bold',
-                    color: '#ffffff'
-                });
-
-                if (this.isMultiplayer) {
-                    this.add.text(panelX, 310, 'COMBO', {
-                        fontSize: '18px',
-                        color: '#aaaaaa'
-                    });
-                    this.comboText = this.add.text(panelX, 335, 'x0', {
-                        fontSize: '24px',
-                        fontStyle: 'bold',
-                        color: '#ff6600'
-                    });
-                }
-
-                this.add.text(panelX, 390, 'NEXT', {
-                    fontSize: '18px',
-                    color: '#aaaaaa'
-                });
-
-                // Keyboard input
-                this.cursors = this.input.keyboard.createCursorKeys();
-                this.input.keyboard.on('keydown-SPACE', () => this.hardDrop());
-                this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
-                
-                this.lastRotateTime = 0;
-                this.lastMoveTime = 0;
-
-                // Initialize first piece
-                this.spawnNewPiece();
-                this.spawnNextPiece();
-                this.drawNextPiece();
-
-                // Setup multiplayer if needed
-                if (this.isMultiplayer) {
-                    this.setupMultiplayerSync();
-                    this.createOpponentPreviews();
-                }
-            }
-
-            createMainGrid() {
-                const gridBg = this.add.rectangle(
-                    BLOCK_SIZE * GRID_WIDTH / 2,
-                    BLOCK_SIZE * GRID_HEIGHT / 2,
-                    BLOCK_SIZE * GRID_WIDTH,
-                    BLOCK_SIZE * GRID_HEIGHT,
-                    0x0f0f1e
-                );
-
-                // Draw grid lines
-                for (let y = 0; y <= GRID_HEIGHT; y++) {
-                    this.add.line(
-                        0, 0,
-                        0, y * BLOCK_SIZE,
-                        GRID_WIDTH * BLOCK_SIZE, y * BLOCK_SIZE,
-                        0x2a2a3e
-                    ).setOrigin(0);
-                }
-                for (let x = 0; x <= GRID_WIDTH; x++) {
-                    this.add.line(
-                        0, 0,
-                        x * BLOCK_SIZE, 0,
-                        x * BLOCK_SIZE, GRID_HEIGHT * BLOCK_SIZE,
-                        0x2a2a3e
-                    ).setOrigin(0);
-                }
-            }
-
-            createOpponentPreviews() {
-                const startY = 480;
-                const previewWidth = 100;
-                const previewHeight = 120;
-                const spacing = 10;
-
-                this.opponentPreviews = [];
-                
-                for (let i = 0; i < 3; i++) {
-                    const x = BLOCK_SIZE * GRID_WIDTH + 20;
-                    const y = startY + i * (previewHeight + spacing);
-                    
-                    const bg = this.add.rectangle(x + previewWidth/2, y + previewHeight/2, previewWidth, previewHeight, 0x0f0f1e, 0.5)
-                        .setStrokeStyle(2, 0x2a2a3e);
-                    
-                    const nameText = this.add.text(x + 5, y + 5, 'Waiting...', {
-                        fontSize: '10px',
-                        color: '#aaaaaa'
-                    });
-
-                    this.opponentPreviews.push({ bg, nameText, x, y });
-                }
-            }
-
-            setupMultiplayerSync() {
-                // Send game state updates
-                this.gameStateRef = database.ref(`rooms/${this.roomId}/players/${this.playerId}`);
-                
-                // Listen for opponent states
-                database.ref(`rooms/${this.roomId}/players`).on('value', (snapshot) => {
-                    const players = snapshot.val() || {};
-                    this.updateOpponents(players);
-                });
-
-                // Listen for incoming attacks
-                database.ref(`rooms/${this.roomId}/players/${this.playerId}/incomingAttack`).on('value', (snapshot) => {
-                    const attack = snapshot.val() || 0;
-                    if (attack > 0) {
-                        this.receiveAttack(attack);
-                        database.ref(`rooms/${this.roomId}/players/${this.playerId}/incomingAttack`).set(0);
-                    }
-                });
-            }
-
-            updateOpponents(players) {
-                const opponents = Object.entries(players).filter(([id, _]) => id !== this.playerId);
-                
-                opponents.forEach(([id, player], index) => {
-                    if (index < this.opponentPreviews.length && player.alive) {
-                        this.opponentPreviews[index].nameText.setText(`${player.name}\n${player.score}`);
-                    }
-                });
-            }
-
-            sendAttack(lines) {
-                if (!this.isMultiplayer) return;
-
-                // Send garbage lines to all opponents
-                database.ref(`rooms/${this.roomId}/players`).once('value', (snapshot) => {
-                    const players = snapshot.val() || {};
-                    
-                    Object.keys(players).forEach((id) => {
-                        if (id !== this.playerId && players[id].alive) {
-                            const currentAttack = players[id].incomingAttack || 0;
-                            database.ref(`rooms/${this.roomId}/players/${id}/incomingAttack`).set(currentAttack + lines);
-                        }
-                    });
-                });
-
-                // Show attack indicator
-                this.showAttackIndicator(lines);
-            }
-
-            showAttackIndicator(lines) {
-                const text = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `⚔️ ${lines} LINE ATTACK! ⚔️`, {
-                    fontSize: '24px',
-                    fontStyle: 'bold',
-                    color: '#ff0000',
-                    stroke: '#ffffff',
-                    strokeThickness: 3
-                }).setOrigin(0.5);
-
-                this.tweens.add({
-                    targets: text,
-                    y: GAME_HEIGHT / 2 - 100,
-                    alpha: 0,
-                    duration: 1500,
-                    onComplete: () => text.destroy()
-                });
-            }
-
-            receiveAttack(lines) {
-                this.addDummyLines(lines);
-                
-                const text = this.add.text(GAME_WIDTH / 2, 100, `⚠️ INCOMING ${lines} LINES! ⚠️`, {
-                    fontSize: '20px',
-                    fontStyle: 'bold',
-                    color: '#ff6600',
-                    stroke: '#000000',
-                    strokeThickness: 3
-                }).setOrigin(0.5);
-
-                this.tweens.add({
-                    targets: text,
-                    y: 50,
-                    alpha: 0,
-                    duration: 2000,
-                    onComplete: () => text.destroy()
-                });
-            }
-
-            spawnNewPiece() {
-                if (this.nextPiece) {
-                    this.currentPiece = this.nextPiece;
-                } else {
-                    const shapes = Object.keys(SHAPES);
-                    const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
-                    this.currentPiece = {
-                        shape: SHAPES[randomShape],
-                        type: randomShape,
-                        x: Math.floor(GRID_WIDTH / 2) - 1,
-                        y: 0,
-                        color: COLORS[randomShape]
-                    };
-                }
-
-                if (this.checkCollision(this.currentPiece.x, this.currentPiece.y, this.currentPiece.shape)) {
-                    this.endGame();
-                }
-            }
-
-            spawnNextPiece() {
-                const shapes = Object.keys(SHAPES);
-                const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
-                this.nextPiece = {
-                    shape: SHAPES[randomShape],
-                    type: randomShape,
-                    x: Math.floor(GRID_WIDTH / 2) - 1,
-                    y: 0,
-                    color: COLORS[randomShape]
-                };
-            }
-
-            drawNextPiece() {
-                if (this.nextPieceGraphics) {
-                    this.nextPieceGraphics.forEach(row => row.forEach(block => {
-                        if (block) block.destroy();
-                    }));
-                }
-
-                this.nextPieceGraphics = [];
-                const startX = BLOCK_SIZE * GRID_WIDTH + 40;
-                const startY = 420;
-
-                this.nextPiece.shape.forEach((row, y) => {
-                    this.nextPieceGraphics[y] = [];
-                    row.forEach((cell, x) => {
-                        if (cell) {
-                            const block = this.add.rectangle(
-                                startX + x * 25,
-                                startY + y * 25,
-                                23, 23,
-                                this.nextPiece.color
-                            );
-                            this.nextPieceGraphics[y][x] = block;
-                        }
-                    });
-                });
-            }
-
-            update(time, delta) {
-                if (this.gameOver || this.paused) return;
-
-                // Quiz timer
-                if (!this.quizActive) {
-                    this.quizTimer += delta;
-                    if (this.quizTimer >= this.quizInterval) {
-                        this.quizTimer = 0;
-                        this.showQuiz();
-                        return;
-                    }
-                }
-
-                if (this.quizActive) return;
-
-                // Handle input
-                if (this.cursors.left.isDown && time > this.lastMoveTime + 100) {
-                    this.movePiece(-1, 0);
-                    this.lastMoveTime = time;
-                } else if (this.cursors.right.isDown && time > this.lastMoveTime + 100) {
-                    this.movePiece(1, 0);
-                    this.lastMoveTime = time;
-                }
-
-                if (this.cursors.up.isDown && time > this.lastRotateTime + 200) {
-                    this.rotatePiece();
-                    this.lastRotateTime = time;
-                }
-
-                this.fastDrop = this.cursors.down.isDown;
-                const currentInterval = this.fastDrop ? 50 : this.dropInterval;
-
-                this.dropTimer += delta;
-                if (this.dropTimer >= currentInterval) {
-                    this.dropTimer = 0;
-                    if (!this.movePiece(0, 1)) {
-                        this.lockPiece();
-                    }
-                }
-
-                // Check combo timeout
-                if (time - this.lastClearTime > 3000) {
-                    this.combo = 0;
-                    if (this.comboText) this.comboText.setText('x0');
-                }
-
-                this.render();
-                
-                // Sync multiplayer state
-                if (this.isMultiplayer && time % 1000 < 16) {
-                    this.syncGameState();
-                }
-            }
-
-            syncGameState() {
-                if (this.gameStateRef) {
-                    this.gameStateRef.update({
-                        score: this.score,
-                        alive: !this.gameOver,
-                        grid: this.grid
-                    });
-                }
-            }
-
-            movePiece(dx, dy) {
-                const newX = this.currentPiece.x + dx;
-                const newY = this.currentPiece.y + dy;
-
-                if (!this.checkCollision(newX, newY, this.currentPiece.shape)) {
-                    this.currentPiece.x = newX;
-                    this.currentPiece.y = newY;
-                    return true;
-                }
-                return false;
-            }
-
-            rotatePiece() {
-                const rotated = this.currentPiece.shape[0].map((_, i) =>
-                    this.currentPiece.shape.map(row => row[i]).reverse()
-                );
-
-                if (!this.checkCollision(this.currentPiece.x, this.currentPiece.y, rotated)) {
-                    this.currentPiece.shape = rotated;
-                }
-            }
-
-            hardDrop() {
-                while (this.movePiece(0, 1)) {
-                    this.score += 2;
-                }
-                this.lockPiece();
-                this.scoreText.setText(this.score);
-            }
-
-            checkCollision(x, y, shape) {
-                for (let row = 0; row < shape.length; row++) {
-                    for (let col = 0; col < shape[row].length; col++) {
-                        if (shape[row][col]) {
-                            const newX = x + col;
-                            const newY = y + row;
-
-                            if (newX < 0 || newX >= GRID_WIDTH || newY >= GRID_HEIGHT) {
-                                return true;
-                            }
-
-                            if (newY >= 0 && this.grid[newY][newX]) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-                return false;
-            }
-
-            lockPiece() {
-                this.currentPiece.shape.forEach((row, y) => {
-                    row.forEach((cell, x) => {
-                        if (cell) {
-                            const gridY = this.currentPiece.y + y;
-                            const gridX = this.currentPiece.x + x;
-                            if (gridY >= 0 && gridY < GRID_HEIGHT && gridX >= 0 && gridX < GRID_WIDTH) {
-                                this.grid[gridY][gridX] = this.currentPiece.color;
-                            }
-                        }
-                    });
-                });
-
-                const linesCleared = this.clearLines();
-                if (linesCleared > 0) {
-                    this.lines += linesCleared;
-                    const baseScore = [0, 100, 300, 500, 800][linesCleared];
-                    this.score += baseScore * this.level * (1 + this.combo * 0.5);
-                    this.linesText.setText(this.lines);
-                    this.scoreText.setText(Math.floor(this.score));
-
-                    // Update combo
-                    this.combo++;
-                    this.lastClearTime = this.time.now;
-                    if (this.comboText) this.comboText.setText(`x${this.combo}`);
-
-                    // Attack in multiplayer
-                    if (this.isMultiplayer && linesCleared >= 2) {
-                        const attackLines = linesCleared === 2 ? 1 : linesCleared === 3 ? 2 : 4;
-                        this.sendAttack(attackLines * Math.max(1, Math.floor(this.combo / 2)));
-                    }
-
-                    // Level up
-                    const newLevel = Math.floor(this.lines / 10) + 1;
-                    if (newLevel > this.level) {
-                        this.level = newLevel;
-                        this.levelText.setText(this.level);
-                        this.dropInterval = Math.max(100, 1000 - (this.level - 1) * 100);
-                    }
-                }
-
-                this.spawnNewPiece();
-                this.spawnNextPiece();
-                this.drawNextPiece();
-            }
-
-            clearLines() {
-                let linesCleared = 0;
-                for (let y = GRID_HEIGHT - 1; y >= 0; y--) {
-                    if (this.grid[y].every(cell => cell !== 0)) {
-                        this.grid.splice(y, 1);
-                        this.grid.unshift(Array(GRID_WIDTH).fill(0));
-                        linesCleared++;
-                        y++;
-                    }
-                }
-                return linesCleared;
-            }
-
-            showQuiz() {
-                this.quizActive = true;
-
-                let availableQuestions = QUIZ_QUESTIONS.filter((q, index) => !this.usedQuestions.includes(index));
-                if (availableQuestions.length === 0) {
-                    this.usedQuestions = [];
-                    availableQuestions = QUIZ_QUESTIONS;
-                }
-                
-                const questionIndex = QUIZ_QUESTIONS.indexOf(availableQuestions[Math.floor(Math.random() * availableQuestions.length)]);
-                this.usedQuestions.push(questionIndex);
-                const question = QUIZ_QUESTIONS[questionIndex];
-
-                const overlay = this.add.rectangle(
-                    GAME_WIDTH / 2,
-                    GAME_HEIGHT / 2,
-                    GAME_WIDTH - 40,
-                    400,
-                    0x1a1a2e,
-                    0.98
-                ).setStrokeStyle(4, 0x667eea);
-
-                const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 170, 'PHOENICIAN QUIZ!', {
-                    fontSize: '28px',
-                    fontStyle: 'bold',
-                    color: '#667eea'
-                }).setOrigin(0.5);
-
-                const questionText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, question.question, {
-                    fontSize: '18px',
-                    color: '#ffffff',
-                    wordWrap: { width: GAME_WIDTH - 100 },
-                    align: 'center'
-                }).setOrigin(0.5);
-
-                const buttons = [];
-                const buttonY = GAME_HEIGHT / 2 - 40;
-                
-                question.answers.forEach((answer, index) => {
-                    const y = buttonY + (index * 70);
-                    
-                    const button = this.add.rectangle(
-                        GAME_WIDTH / 2,
-                        y,
-                        GAME_WIDTH - 100,
-                        55,
-                        0x2a2a3e
-                    ).setInteractive().setStrokeStyle(2, 0x667eea);
-
-                    const answerText = this.add.text(GAME_WIDTH / 2, y, answer, {
-                        fontSize: '16px',
-                        color: '#ffffff',
-                        wordWrap: { width: GAME_WIDTH - 120 },
-                        align: 'center'
-                    }).setOrigin(0.5);
-
-                    button.on('pointerover', () => {
-                        button.setFillStyle(0x3a3a4e);
-                    });
-
-                    button.on('pointerout', () => {
-                        button.setFillStyle(0x2a2a3e);
-                    });
-
-                    button.on('pointerdown', () => {
-                        this.handleAnswer(index === question.correct, overlay, title, questionText, buttons, answerText);
-                    });
-
-                    buttons.push({ button, text: answerText });
-                });
-
-                this.quizOverlay = { overlay, title, questionText, buttons };
-            }
-
-            handleAnswer(correct, overlay, title, questionText, buttons, selectedText) {
-                buttons.forEach(({ button, text }) => {
-                    button.disableInteractive();
-                    button.setFillStyle(0x2a2a3e);
-                });
-
-                if (correct) {
-                    selectedText.setColor('#00ff00');
-                    title.setText('CORRECT! ✓');
-                    title.setColor('#00ff00');
-                    
-                    this.removeTopLine();
-                    
-                    // Send attack in multiplayer
-                    if (this.isMultiplayer) {
-                        this.sendAttack(1);
-                    }
-                    
-                    const feedback = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 160, 
-                        this.isMultiplayer ? 'Line removed + 1 attack sent!' : 'Top line removed!', {
-                        fontSize: '18px',
-                        color: '#00ff00',
-                        fontStyle: 'bold'
-                    }).setOrigin(0.5);
-
-                    this.time.delayedCall(2000, () => {
-                        overlay.destroy();
-                        title.destroy();
-                        questionText.destroy();
-                        feedback.destroy();
-                        buttons.forEach(({ button, text }) => {
-                            button.destroy();
-                            text.destroy();
-                        });
-                        this.quizActive = false;
-                    });
-                } else {
-                    selectedText.setColor('#ff0000');
-                    title.setText('INCORRECT! ✗');
-                    title.setColor('#ff0000');
-                    
-                    this.addDummyLines(2);
-                    
-                    const feedback = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 160, '2 penalty lines added!', {
-                        fontSize: '18px',
-                        color: '#ff0000',
-                        fontStyle: 'bold'
-                    }).setOrigin(0.5);
-
-                    this.time.delayedCall(2000, () => {
-                        overlay.destroy();
-                        title.destroy();
-                        questionText.destroy();
-                        feedback.destroy();
-                        buttons.forEach(({ button, text }) => {
-                            button.destroy();
-                            text.destroy();
-                        });
-                        this.quizActive = false;
-                    });
-                }
-            }
-
-            removeTopLine() {
-                for (let y = 0; y < GRID_HEIGHT; y++) {
-                    if (this.grid[y].some(cell => cell !== 0)) {
-                        this.grid.splice(y, 1);
-                        this.grid.unshift(Array(GRID_WIDTH).fill(0));
-                        break;
-                    }
-                }
-            }
-
-            addDummyLines(count) {
-                for (let i = 0; i < count; i++) {
-                    this.grid.shift();
-                    
-                    const newLine = Array(GRID_WIDTH).fill(0);
-                    const gapPositions = [];
-                    
-                    const numGaps = Math.floor(Math.random() * 2) + 2;
-                    while (gapPositions.length < numGaps) {
-                        const pos = Math.floor(Math.random() * GRID_WIDTH);
-                        if (!gapPositions.includes(pos)) {
-                            gapPositions.push(pos);
-                        }
-                    }
-                    
-                    const colorValues = Object.values(COLORS);
-                    for (let x = 0; x < GRID_WIDTH; x++) {
-                        if (!gapPositions.includes(x)) {
-                            newLine[x] = colorValues[Math.floor(Math.random() * colorValues.length)];
-                        }
-                    }
-                    
-                    this.grid.push(newLine);
-                }
-            }
-
-            render() {
-                for (let y = 0; y < GRID_HEIGHT; y++) {
-                    for (let x = 0; x < GRID_WIDTH; x++) {
-                        if (this.gridGraphics[y][x]) {
-                            this.gridGraphics[y][x].destroy();
-                            this.gridGraphics[y][x] = null;
-                        }
-                    }
-                }
-
-                for (let y = 0; y < GRID_HEIGHT; y++) {
-                    for (let x = 0; x < GRID_WIDTH; x++) {
-                        if (this.grid[y][x]) {
-                            this.gridGraphics[y][x] = this.add.rectangle(
-                                x * BLOCK_SIZE + BLOCK_SIZE / 2,
-                                y * BLOCK_SIZE + BLOCK_SIZE / 2,
-                                BLOCK_SIZE - 2,
-                                BLOCK_SIZE - 2,
-                                this.grid[y][x]
-                            );
-                        }
-                    }
-                }
-
-                if (this.currentPiece) {
-                    this.currentPiece.shape.forEach((row, y) => {
-                        row.forEach((cell, x) => {
-                            if (cell) {
-                                const gridY = this.currentPiece.y + y;
-                                const gridX = this.currentPiece.x + x;
-                                if (gridY >= 0 && gridY < GRID_HEIGHT && gridX >= 0 && gridX < GRID_WIDTH) {
-                                    this.gridGraphics[gridY][gridX] = this.add.rectangle(
-                                        gridX * BLOCK_SIZE + BLOCK_SIZE / 2,
-                                        gridY * BLOCK_SIZE + BLOCK_SIZE / 2,
-                                        BLOCK_SIZE - 2,
-                                        BLOCK_SIZE - 2,
-                                        this.currentPiece.color
-                                    );
-                                }
-                            }
-                        });
-                    });
-                }
-            }
-
-            pauseGame() {
-                this.paused = !this.paused;
-                // Could add pause overlay here
-            }
-
-            async endGame() {
-                this.gameOver = true;
-                
-                // Save to leaderboard
-                if (this.score > 0) {
-                    await database.ref('leaderboard').push({
-                        name: this.playerName,
-                        score: this.score,
-                        timestamp: Date.now()
-                    });
-                }
-
-                // Update room if multiplayer
-                if (this.isMultiplayer && this.gameStateRef) {
-                    await this.gameStateRef.update({ alive: false });
-                }
-                
-                const overlay = this.add.rectangle(
-                    GAME_WIDTH / 2,
-                    GAME_HEIGHT / 2,
-                    GAME_WIDTH,
-                    GAME_HEIGHT,
-                    0x000000,
-                    0.7
-                );
-
-                this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'GAME OVER', {
-                    fontSize: '48px',
-                    fontStyle: 'bold',
-                    color: '#ff0000'
-                }).setOrigin(0.5);
-
-                this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, `Final Score: ${Math.floor(this.score)}`, {
-                    fontSize: '24px',
-                    color: '#ffffff'
-                }).setOrigin(0.5);
-
-                this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Click to return to menu', {
-                    fontSize: '18px',
-                    color: '#aaaaaa'
-                }).setOrigin(0.5);
-
-                this.input.once('pointerdown', () => {
-                    if (this.roomRef) this.roomRef.off();
-                    if (this.gameStateRef) this.gameStateRef.off();
-                    this.scene.start('TitleScreen');
-                });
-            }
+        if (any) {
+          for (let x = 0; x < this.width; x++) {
+            this.backBoard[x + y * this.width] = 0;
+          }
+          return;
         }
+      }
+    }
+    addGarbageLines(count) {
+      for (let i = 0; i < count; i++) {
+        for (let y = 0; y < this.height - 1; y++) {
+          for (let x = 0; x < this.width; x++) {
+            this.backBoard[x + y * this.width] = this.backBoard[x + (y + 1) * this.width];
+          }
+        }
+        const hole = Math.floor(Math.random() * this.width);
+        for (let x = 0; x < this.width; x++) {
+          this.backBoard[x + (this.height - 1) * this.width] = (x === hole) ? 0 : 8;
+        }
+      }
+    }
+    clearBottomLines(count) {
+      for (let c = 0; c < count; c++) {
+        for (let x = 0; x < this.width; x++) {
+          this.backBoard[x + (this.height - 1) * this.width] = 0;
+        }
+      }
+    }
+  }
 
-        const config = {
-            type: Phaser.AUTO,
-            width: GAME_WIDTH,
-            height: GAME_HEIGHT,
-            parent: 'game-container',
-            scene: [TitleScreen, LobbyScene, LeaderboardScene, TetrisGame],
-            backgroundColor: '#1a1a2e',
-            dom: {
-                createContainer: true
-            }
-        };
+  // simple wall-kick rotate: try rotate in place, then x-1, then x+1
+  function attemptRotate(delta) {
+    if (!board || board.currentShape === SHAPES.NONE) return;
+    const newDir = (board.currentDir + delta + 4) % 4;
+    const x = board.currentX;
+    const y = board.currentY;
 
-        const game = new Phaser.Game(config);
-    </script>
+    if (board.tryMove(board.currentShape, newDir, x, y)) {
+      board.currentDir = newDir;
+      playSfx('rotate');
+      return;
+    }
+    if (board.tryMove(board.currentShape, newDir, x - 1, y)) {
+      board.currentX = x - 1;
+      board.currentDir = newDir;
+      playSfx('rotate');
+      return;
+    }
+    if (board.tryMove(board.currentShape, newDir, x + 1, y)) {
+      board.currentX = x + 1;
+      board.currentDir = newDir;
+      playSfx('rotate');
+      return;
+    }
+  }
+
+  // ==========================
+  // 5. START GAME (PHASER + LISTENERS)
+  // ==========================
+  function startGame() {
+    const config = {
+      type: Phaser.AUTO,
+      width: WIDTH * GRID,
+      height: HEIGHT * GRID,
+      parent: 'game-container',
+      backgroundColor: '#050814',
+      scene: { preload, create, update }
+    };
+    game = new Phaser.Game(config);
+
+    window.addEventListener('beforeunload', () => {
+      if (playerDocId) {
+        db.collection('tetrisPlayers').doc(playerDocId).delete().catch(() => {});
+      }
+    });
+  }
+
+  function preload() {
+    // Audio assets (from /sounds)
+    this.load.audio('move',   'sounds/move.wav');
+    this.load.audio('rotate', 'sounds/rotate.wav');
+    this.load.audio('drop',   'sounds/drop.wav');
+    this.load.audio('line',   'sounds/line.wav');
+    this.load.audio('attack', 'sounds/attack.wav');
+    this.load.audio('hit',    'sounds/hit.wav');
+    this.load.audio('bgm',    'sounds/bgm.mp3');
+  }
+
+  function create() {
+    board = new Board();
+    board.spawn();
+    graphics = this.add.graphics();
+
+    // setup sounds
+    sfx.move   = this.sound.add('move',   { volume: 0.25 });
+    sfx.rotate = this.sound.add('rotate', { volume: 0.25 });
+    sfx.drop   = this.sound.add('drop',   { volume: 0.3 });
+    sfx.line   = this.sound.add('line',   { volume: 0.3 });
+    sfx.attack = this.sound.add('attack', { volume: 0.4 });
+    sfx.hit    = this.sound.add('hit',    { volume: 0.4 });
+
+    bgm = this.sound.add('bgm', { loop: true, volume: 0.18 });
+    if (bgm) bgm.play();
+
+    cursors = this.input.keyboard.createCursorKeys();
+    keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    keyE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+
+    keySpace.on('down', () => {
+      if (questionActive || storeOpen) return;
+      const lines = board.dropDown();
+      playSfx('drop');
+      if (lines > 0) onLinesCleared(lines);
+    });
+
+    this.input.keyboard.on('keydown', (event) => {
+      if (questionActive || storeOpen) return;
+      switch (event.code) {
+        case 'ArrowLeft':
+          if (board.tryMove(board.currentShape, board.currentDir, board.currentX - 1, board.currentY)) {
+            board.currentX--;
+            playSfx('move');
+          }
+          break;
+        case 'ArrowRight':
+          if (board.tryMove(board.currentShape, board.currentDir, board.currentX + 1, board.currentY)) {
+            board.currentX++;
+            playSfx('move');
+          }
+          break;
+        case 'ArrowUp':
+          attemptRotate(1);
+          break;
+      }
+    });
+
+    keyE.on('down', () => {
+      if (questionActive) return;
+      if (storeOpen) closeStore();
+      else openStore();
+    });
+
+    this.time.addEvent({
+      delay: 60000,
+      loop: true,
+      callback: () => {
+        if (!storeOpen) askQuestion();
+      }
+    });
+
+    recalcScore();
+    setupFirestoreListeners();
+  }
+
+  function update(time, delta) {
+    if (questionActive || storeOpen) return;
+
+    let interval = dropInterval;
+    if (cursors && cursors.down && cursors.down.isDown) {
+      interval = dropInterval / 5;
+    }
+
+    dropTimer += delta;
+    if (dropTimer >= interval) {
+      dropTimer = 0;
+      const lines = board.stepDown();
+      if (lines > 0) onLinesCleared(lines);
+    }
+
+    drawBoard();
+  }
+
+  function drawBoard() {
+    graphics.clear();
+    const colors = {
+      1: 0xcc6666,
+      2: 0x66cc66,
+      3: 0x6666cc,
+      4: 0xcccc66,
+      5: 0xcc66cc,
+      6: 0x66cccc,
+      7: 0xdaaa00,
+      8: 0x999999
+    };
+
+    graphics.lineStyle(1, 0x111122, 0.5);
+    for (let x = 0; x <= WIDTH; x++) {
+      graphics.strokeLineShape(new Phaser.Geom.Line(x * GRID, 0, x * GRID, HEIGHT * GRID));
+    }
+    for (let y = 0; y <= HEIGHT; y++) {
+      graphics.strokeLineShape(new Phaser.Geom.Line(0, y * GRID, WIDTH * GRID, y * GRID));
+    }
+
+    for (let x = 0; x < WIDTH; x++) {
+      for (let y = 0; y < HEIGHT; y++) {
+        const val = board.value(x, y);
+        if (val > 0) {
+          graphics.fillStyle(colors[val] || 0xffffff, 1);
+          graphics.fillRect(x * GRID + 2, y * GRID + 2, GRID - 4, GRID - 4);
+        }
+      }
+    }
+
+    if (board.currentShape !== SHAPES.NONE) {
+      const coords = board.coords(board.currentShape, board.currentDir, board.currentX, board.currentY);
+      for (const [x, y] of coords) {
+        graphics.fillStyle(colors[board.currentShape] || 0xffffff, 1);
+        graphics.fillRect(x * GRID + 2, y * GRID + 2, GRID - 4, GRID - 4);
+      }
+    }
+  }
+
+  // ==========================
+  // 6. SCORING + HUD + PLAYER DOC
+  // ==========================
+  function onLinesCleared(lines) {
+    linesCleared += lines;
+    score += lines * 100;
+    coins += lines;
+    recalcScore();
+    playSfx('line');
+  }
+
+  function recalcScore() {
+    hudScore.textContent = score;
+    hudLines.textContent = linesCleared;
+    hudCoins.textContent = coins;
+    hudShield.textContent = shieldActive ? "ON" : "OFF";
+
+    if (!playerDocId) return;
+    db.collection('tetrisPlayers').doc(playerDocId).set({
+      name: playerName,
+      roomId: roomId,
+      score: score,
+      linesCleared: linesCleared,
+      coins: coins,
+      shield: shieldActive,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  }
+
+  // ==========================
+  // 7. FIRESTORE LISTENERS
+  // ==========================
+  function setupFirestoreListeners() {
+    db.collection('tetrisPlayers')
+      .where('roomId', '==', roomId)
+      .onSnapshot(snapshot => {
+        const players = [];
+        snapshot.forEach(doc => {
+          players.push({ id: doc.id, ...doc.data() });
+        });
+        currentPlayers = players;
+
+        if (players.length === 0) {
+          leaderboardBody.textContent = "Waiting for players...";
+        } else {
+          const sorted = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+          leaderboardBody.innerHTML = sorted.map((p, i) =>
+            `${i + 1}. ${p.name}: ${p.score || 0} (${p.coins || 0}c)`
+          ).join("<br>");
+        }
+      });
+
+    if (!playerDocId) return;
+    db.collection('tetrisAttacks')
+      .where('roomId', '==', roomId)
+      .where('toId', '==', playerDocId)
+      .onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            handleIncomingAttack(change.doc);
+          }
+        });
+      });
+  }
+
+  async function handleIncomingAttack(doc) {
+    const attack = doc.data();
+    if (attack.resolved) return;
+
+    if (shieldActive) {
+      shieldActive = false;
+      recalcScore();
+    } else {
+      if (attack.type === 'garbage2') board.addGarbageLines(2);
+      if (attack.type === 'garbage4') board.addGarbageLines(4);
+      playSfx('hit');
+    }
+    await doc.ref.update({ resolved: true });
+  }
+
+  async function sendAttack(type) {
+    const opponents = currentPlayers.filter(p => p.id !== playerDocId);
+    if (opponents.length === 0) {
+      alert("No opponents in this room yet.");
+      return;
+    }
+    const target = opponents[Math.floor(Math.random() * opponents.length)];
+
+    await db.collection('tetrisAttacks').add({
+      roomId: roomId,
+      fromId: playerDocId,
+      fromName: playerName,
+      toId: target.id,
+      toName: target.name,
+      type: type,
+      timestamp: Date.now(),
+      resolved: false
+    });
+
+    playSfx('attack');
+    alert(`Sent ${type} to ${target.name}!`);
+  }
+
+  // ==========================
+  // 8. STORE
+  // ==========================
+  btnGarbage2.onclick = () => buyItem('garbage2');
+  btnGarbage4.onclick = () => buyItem('garbage4');
+  btnShield.onclick = () => buyItem('shield');
+  btnClear.onclick = () => buyItem('clear');
+  btnStoreClose.onclick = () => closeStore();
+
+  function openStore() {
+    storeOpen = true;
+    storeOverlay.classList.remove('hidden');
+  }
+  function closeStore() {
+    storeOpen = false;
+    storeOverlay.classList.add('hidden');
+  }
+
+  function buyItem(type) {
+    const costMap = { garbage2: 3, garbage4: 5, shield: 4, clear: 5 };
+    const cost = costMap[type];
+    if (coins < cost) {
+      alert("Not enough coins.");
+      return;
+    }
+    coins -= cost;
+
+    if (type === 'shield') {
+      shieldActive = true;
+      recalcScore();
+    } else if (type === 'clear') {
+      board.clearBottomLines(2);
+      recalcScore();
+    } else {
+      sendAttack(type);
+      recalcScore();
+    }
+  }
+
+  // ==========================
+  // 9. QUIZ OVERLAY
+  // ==========================
+  function askQuestion() {
+    if (questionActive) return;
+    if (questionIndex >= QUESTIONS.length) return;
+
+    questionActive = true;
+    const q = QUESTIONS[questionIndex++];
+    questionText.textContent = q.text;
+    answersDiv.innerHTML = "";
+
+    q.options.forEach((opt, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'answer-btn';
+      btn.textContent = opt;
+      btn.onclick = () => {
+        const correct = idx === q.correctIndex;
+        if (correct) {
+          board.clearTopFilledRow();
+          coins += 3;
+          playSfx('line');
+        } else {
+          board.addGarbageLines(2);
+          playSfx('hit');
+        }
+        recalcScore();
+        questionOverlay.classList.add('hidden');
+        questionActive = false;
+      };
+      answersDiv.appendChild(btn);
+    });
+
+    questionOverlay.classList.remove('hidden');
+  }
+</script>
 </body>
 </html>
