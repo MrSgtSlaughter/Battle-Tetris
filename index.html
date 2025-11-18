@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <title>Battle Tetris</title>
 
-  <!-- Phaser 3 -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
 
-  <!-- Firebase (compat SDKs for easiest syntax) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
@@ -308,7 +306,6 @@
   Copyright 2025 Jason Slaughter PixelED Path, LLC
 </div>
 
-<!-- Start / Title overlay -->
 <div id="start-overlay" class="overlay">
   <div class="overlay-box">
     <h1 id="title-text">Battle Tetris</h1>
@@ -328,7 +325,6 @@
   </div>
 </div>
 
-<!-- Question overlay -->
 <div id="question-overlay" class="overlay hidden">
   <div class="overlay-box">
     <h2>Answer the question!</h2>
@@ -337,12 +333,11 @@
   </div>
 </div>
 
-<!-- Store overlay -->
 <div id="store-overlay" class="overlay hidden">
   <div class="overlay-box">
     <h2>Store</h2>
     <p>Use coins to attack or defend.</p>
-    <p><strong>Attacks (hit random opponent in your room):</strong></p>
+    <p><strong>Attacks (hit first place opponent in your room):</strong></p>
     <button class="store-btn" id="buy-garbage2">Garbage +2 (3 coins)</button>
     <button class="store-btn" id="buy-garbage4">Garbage +4 (5 coins)</button>
     <p><strong>Defense / Utility:</strong></p>
@@ -353,7 +348,6 @@
   </div>
 </div>
 
-<!-- Attack + Game Over banners -->
 <div id="attack-banner"></div>
 <div id="game-over-banner">GAME OVER – Board Reset</div>
 
@@ -1191,16 +1185,30 @@
   }
 
   async function sendAttack(type) {
-    const opponents = currentPlayers.filter(p => p.id !== playerDocId);
+    const myId = playerDocId;
+
+    // 1. Sort players to find the first place opponent
+    const opponents = currentPlayers.filter(p => p.id !== myId);
     if (opponents.length === 0) {
       alert("No opponents in this room yet.");
       return;
     }
-    const target = opponents[Math.floor(Math.random() * opponents.length)];
+    
+    // Sort players by score (descending)
+    const sortedOpponents = opponents.sort((a, b) => (b.score || 0) - (a.score || 0));
+    
+    // Target is the first player in the sorted list (the one with the highest score)
+    const target = sortedOpponents[0];
+
+    // Check if the target is defined (should always be if opponents.length > 0)
+    if (!target) {
+        alert("Could not determine a target for the attack.");
+        return;
+    }
 
     await db.collection('tetrisAttacks').add({
       roomId: roomId,
-      fromId: playerDocId,
+      fromId: myId,
       fromName: playerName,
       toId: target.id,
       toName: target.name,
@@ -1210,7 +1218,7 @@
     });
 
     playSfx('attack');
-    alert(`Sent ${type} to ${target.name}!`);
+    alert(`Sent ${type} to ${target.name} (1st Place)!`);
   }
 
   // ==========================
